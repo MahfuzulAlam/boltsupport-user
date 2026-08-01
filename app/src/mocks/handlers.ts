@@ -27,6 +27,7 @@ import {
 import {
   addAgentSource,
   addArticle,
+  addConnectedApp,
   addSlaPolicy,
   addWorkflow,
   aiStatsByInbox,
@@ -41,6 +42,7 @@ import {
   pendingTagSuggestions,
   queryConversations,
   removeAgentSource as removeAgentSourceFromDb,
+  removeConnectedApp,
   restoreConversation,
   resyncAgentSource,
   search,
@@ -50,6 +52,7 @@ import {
   updateAiSettings,
   updateArticle,
   updateChannel,
+  updateConnectedApp,
   updateConversation,
   updateInboxSetting,
   updateMessage,
@@ -304,6 +307,45 @@ export const handlers = [
     return updated === undefined
       ? new HttpResponse(null, { status: 404 })
       : HttpResponse.json(updated)
+  }),
+
+  http.get('/api/account/apps', async () => {
+    await pause()
+    return HttpResponse.json(getDb().connectedApps)
+  }),
+
+  http.get('/api/account/apps/:id', async ({ params }) => {
+    await pause()
+    const app = getDb().connectedApps.find((item) => item.id === params['id'])
+    return app === undefined ? new HttpResponse(null, { status: 404 }) : HttpResponse.json(app)
+  }),
+
+  /** Only the two fields a client owns. The id and the secret are the server's to issue. */
+  http.patch('/api/account/apps/:id', async ({ params, request }) => {
+    await pause()
+    const parsed = z
+      .object({ name: z.string().min(1).optional(), redirectUrl: z.string().optional() })
+      .safeParse(await request.json())
+    if (!parsed.success) return HttpResponse.json({ message: 'Invalid app' }, { status: 400 })
+
+    const updated = updateConnectedApp(String(params['id']), parsed.data)
+    return updated === undefined
+      ? new HttpResponse(null, { status: 404 })
+      : HttpResponse.json(updated)
+  }),
+
+  http.post('/api/account/apps', async ({ request }) => {
+    await pause()
+    const parsed = z.object({ name: z.string().min(1) }).safeParse(await request.json())
+    if (!parsed.success) return HttpResponse.json({ message: 'Name the app' }, { status: 400 })
+    return HttpResponse.json(addConnectedApp(parsed.data.name), { status: 201 })
+  }),
+
+  http.delete('/api/account/apps/:id', async ({ params }) => {
+    await pause()
+    return removeConnectedApp(String(params['id']))
+      ? new HttpResponse(null, { status: 204 })
+      : new HttpResponse(null, { status: 404 })
   }),
 
   http.get('/api/contacts', async ({ request }) => {

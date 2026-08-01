@@ -13,6 +13,55 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return isSignedIn ? <>{children}</> : <Navigate to="/login" replace />
 }
 
+/**
+ * Account settings that are in the rail but have no content yet.
+ *
+ * Listed here rather than left out, so the rail is complete and nothing dead ends. Each says what
+ * it is for, so the page is empty rather than broken.
+ */
+const ACCOUNT_PLACEHOLDERS = [
+  {
+    path: '/account/security',
+    title: 'Security and access',
+    description: 'Two factor authentication, active sessions, and connected devices.',
+  },
+  {
+    path: '/account/inboxes',
+    title: 'Inboxes',
+    description: 'Create an inbox, rename one, or decide who can see it.',
+  },
+  {
+    path: '/account/properties',
+    title: 'Properties',
+    description: 'Custom fields kept against a customer rather than a conversation.',
+  },
+  {
+    path: '/account/docs-sites',
+    title: 'Docs sites',
+    description: 'Your public knowledge base: domain, theme, and visibility.',
+  },
+  {
+    path: '/account/company',
+    title: 'Company',
+    description: 'Company name, billing details, and plan.',
+  },
+  {
+    path: '/account/authentication',
+    title: 'Authentication',
+    description: 'Single sign on and how your team proves who they are.',
+  },
+  {
+    path: '/account/role-permissions',
+    title: 'Role permissions',
+    description: 'What each role can do, for everyone in the company.',
+  },
+  {
+    path: '/account/import',
+    title: 'Import data',
+    description: 'Bring conversations and customers over from another helpdesk.',
+  },
+] as const
+
 /** `/inbox/:inboxId` is not a screen; it resolves to the default folder. */
 function InboxIndexRedirect() {
   const { inboxId } = useParams()
@@ -238,34 +287,99 @@ export const router = createBrowserRouter([
         ],
       },
       {
-        path: '/manage/users',
-        lazy: async () => ({
-          Component: (await import('@/features/settings/components/ManagePages')).UsersPage,
-        }),
-      },
-      {
         path: '/manage/teams',
         lazy: async () => ({
           Component: (await import('@/features/settings/components/ManagePages')).TeamsPage,
         }),
       },
+
+      /*
+       * The account area.
+       *
+       * A pathless layout route, so the four `/manage/*` screens that were built before this rail
+       * existed keep the URLs already linked from the nav and from anything anyone bookmarked,
+       * and pick up the sidebar by being nested rather than by being moved.
+       */
       {
-        path: '/manage/tags',
         lazy: async () => ({
-          Component: (await import('@/features/settings/components/ManagePages')).TagsPage,
+          Component: (await import('@/features/settings/components/AccountLayout')).AccountLayout,
         }),
-      },
-      {
-        path: '/manage/integrations',
-        lazy: async () => ({
-          Component: (await import('@/features/settings/components/ManagePages')).IntegrationsPage,
-        }),
-      },
-      {
-        path: '/manage/notifications',
-        lazy: async () => ({
-          Component: (await import('@/features/settings/components/ManagePages')).NotificationsPage,
-        }),
+        children: [
+          {
+            path: '/account/profile',
+            lazy: async () => ({
+              Component: (await import('@/features/settings/components/ProfilePage')).ProfilePage,
+            }),
+          },
+          {
+            path: '/manage/users',
+            lazy: async () => ({
+              Component: (await import('@/features/settings/components/ManagePages')).UsersPage,
+            }),
+          },
+          {
+            path: '/manage/tags',
+            lazy: async () => ({
+              Component: (await import('@/features/settings/components/ManagePages')).TagsPage,
+            }),
+          },
+          {
+            path: '/manage/integrations',
+            lazy: async () => ({
+              Component: (await import('@/features/settings/components/ManagePages'))
+                .IntegrationsPage,
+            }),
+          },
+          {
+            path: '/account/auto-bcc',
+            lazy: async () => ({
+              Component: (await import('@/features/settings/components/AutoBccPage')).AutoBccPage,
+            }),
+          },
+          {
+            path: '/account/permissions',
+            lazy: async () => ({
+              Component: (await import('@/features/settings/components/AccountPermissionsPage'))
+                .AccountPermissionsPage,
+            }),
+          },
+          {
+            path: '/account/my-apps',
+            lazy: async () => ({
+              Component: (await import('@/features/settings/components/MyAppsPage')).MyAppsPage,
+            }),
+          },
+          {
+            path: '/account/my-apps/:appId',
+            lazy: async () => ({
+              Component: (await import('@/features/settings/components/EditAppPage')).EditAppPage,
+            }),
+          },
+          {
+            path: '/account/preferences',
+            lazy: async () => ({
+              Component: (await import('@/features/settings/components/PreferencesPage'))
+                .PreferencesPage,
+            }),
+          },
+          {
+            path: '/manage/notifications',
+            lazy: async () => ({
+              Component: (await import('@/features/settings/components/NotificationsPage'))
+                .NotificationsPage,
+            }),
+          },
+          ...ACCOUNT_PLACEHOLDERS.map(({ path, title, description }) => ({
+            path,
+            lazy: async () => {
+              const { AccountPlaceholder } =
+                await import('@/features/settings/components/AccountPlaceholder')
+              return {
+                Component: () => <AccountPlaceholder title={title} description={description} />,
+              }
+            },
+          })),
+        ],
       },
       {
         path: '/messages',

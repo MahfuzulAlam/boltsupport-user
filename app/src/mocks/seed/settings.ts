@@ -1,5 +1,8 @@
+import { minutesBefore } from '@/lib/rand'
+import { SEED_NOW } from './clock'
 import type {
   AutoReply,
+  ConnectedApp,
   CustomField,
   InboxHours,
   InboxPermissions,
@@ -189,14 +192,75 @@ export const integrations: Integration[] = [
   },
 ]
 
+/**
+ * Defaults that leave a new agent informed without being buried.
+ *
+ * Anything aimed at them personally is on, on mobile; anything about the queue in general is off,
+ * because a notification that fires for every arriving conversation trains people to ignore all
+ * of them. Email stays quiet by default so the app is not a second inbox to clear.
+ */
 export const notificationPrefs: NotificationPrefs = {
+  method: 'default',
   events: {
-    'Assigned to me': { browser: true, email: true },
-    'Mentioned in a note': { browser: true, email: true },
-    'A conversation I own gets a reply': { browser: true, email: false },
-    'An SLA is about to breach': { browser: true, email: true },
-    'A conversation is rated Not good': { browser: false, email: true },
-    'AI escalates to a human': { browser: true, email: false },
+    'new-conversation': { email: false, mobile: false, browser: false },
+    'assigned-to-me': { email: false, mobile: true, browser: true },
+    'assigned-to-other': { email: false, mobile: false, browser: false },
+    'following-updated': { email: false, mobile: true, browser: false },
+    mentioned: { email: true, mobile: true, browser: true },
+    'team-mentioned': { email: false, mobile: true, browser: false },
+    'chat-available': { email: false, mobile: false, browser: true },
+    'chat-assigned': { email: false, mobile: true, browser: true },
+    'chat-reply': { email: false, mobile: false, browser: true },
+    'customer-unassigned': { email: false, mobile: false, browser: false },
+    'customer-mine': { email: false, mobile: true, browser: true },
+    'customer-other': { email: false, mobile: false, browser: false },
+    'user-unassigned': { email: false, mobile: false, browser: false },
+    'user-mine': { email: false, mobile: true, browser: false },
+    'user-other': { email: false, mobile: false, browser: false },
+    'sla-breach': { email: true, mobile: true, browser: true },
+    'rated-not-good': { email: true, mobile: false, browser: true },
+    'ai-escalation': { email: false, mobile: false, browser: true },
   },
   digest: 'daily',
 }
+
+/**
+ * OAuth apps the signed in person has registered.
+ *
+ * Fake credentials that look like the real thing, so the copy controls and the reveal have
+ * something of the right shape to work against.
+ */
+export const connectedApps: ConnectedApp[] = [
+  {
+    id: 'app1',
+    name: 'BoltSupport Support Manager',
+    appId: 'MojHr42vJPOzXqzIKrQQn8VPgepMngS7',
+    secret: 'IkAYIB9YvVJPdAdamwCT5FjEPMmWn3ni',
+    redirectUrl: 'https://support-manager.example.com/oauth/callback',
+    createdAt: minutesBefore(SEED_NOW, 60 * 24 * 210),
+  },
+  {
+    id: 'app2',
+    name: 'AI drafts connection',
+    appId: 'Qb7xLm2ZcRvT9nKdWyEs4HgUpAoJi15F',
+    secret: 'Zt3wNqXbVe8YrLcHm6KpDsGf2JuAoM9i',
+    redirectUrl: 'https://drafts.example.com/callback',
+    createdAt: minutesBefore(SEED_NOW, 60 * 24 * 96),
+  },
+  {
+    id: 'app3',
+    name: 'Ticket analyzer',
+    appId: 'Ec5vTgNa1LzPqWx8ByHrJm3KdSoUf7Qi',
+    secret: 'Rw9pMhCk4XbZtLnQe6YsVd2JfGaUo8Ni',
+    redirectUrl: 'https://analyzer.example.com/oauth',
+    createdAt: minutesBefore(SEED_NOW, 60 * 24 * 41),
+  },
+  {
+    id: 'app4',
+    name: 'TeamSync mailbox API',
+    appId: 'Kd8qWs2ZxNv5TcLpBmHr9YgEo3JaUf6i',
+    secret: 'Lp4mVbXt7ZcQe9NrKhWs2YdGf5JoAu1i',
+    redirectUrl: 'https://teamsync.example.com/auth/return',
+    createdAt: minutesBefore(SEED_NOW, 60 * 24 * 12),
+  },
+]

@@ -63,7 +63,7 @@ export function UserMenu({ onShowShortcuts }: UserMenuProps) {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => void navigate('/manage/users')}>
+        <DropdownMenuItem onSelect={() => void navigate('/account/profile')}>
           <UserRound className="size-4" />
           Your profile
         </DropdownMenuItem>

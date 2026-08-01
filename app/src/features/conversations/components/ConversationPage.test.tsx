@@ -6,8 +6,15 @@ import { renderWithProviders, setViewportWidth } from '@/test/render'
 import { useSidebar } from '@/features/inbox'
 import { ConversationPage } from './ConversationPage'
 
-/** The composer arrives as a lazy chunk, so waiting for it needs more than the 1s default. */
-const LAZY = { timeout: 8000 }
+/*
+ * The composer arrives as a lazy chunk, so waiting for it needs more than the 1s default.
+ *
+ * Generous rather than tight: several suites mount this page, and every one of them pulls the
+ * same Tiptap import. Under a full parallel run that queue is long enough that 8s occasionally
+ * lost. A `findBy` resolves the moment the element appears, so a high ceiling costs nothing when
+ * the machine is quiet and buys a stable suite when it is not.
+ */
+const LAZY = { timeout: 20_000 }
 
 function renderConversation() {
   return renderWithProviders(
@@ -95,9 +102,10 @@ describe('opening the composer', () => {
 
     await user.click(await screen.findByRole('button', { name: /^reply/i }))
     await screen.findByRole('button', { name: /send reply/i }, LAZY)
-    await user.click(screen.getByRole('button', { name: /close the composer/i }))
+    await user.click(screen.getByRole('button', { name: /save & close/i }))
 
-    // Closing is a layout choice, never a destructive one.
+    // Closing is a layout choice, never a destructive one. Discarding is a separate control, so
+    // leaving the composer can never be the thing that loses a half written reply.
     expect(screen.queryByRole('button', { name: /send reply/i })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^reply/i })).toBeInTheDocument()
   })

@@ -1,4 +1,4 @@
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { AiLength, AiTone } from '@/types'
 import type { DraftOptions } from '../hooks/use-auto-draft'
 
@@ -6,7 +6,16 @@ interface AutoDraftOptionsProps {
   options: DraftOptions
   onChange: (options: DraftOptions) => void
   onGenerate: () => void
+  /**
+   * The element the panel hangs off.
+   *
+   * A trigger when uncontrolled, a plain anchor when `open` is supplied. The composer opens this
+   * from a menu item rather than from a button of its own, and one element cannot be both a menu
+   * trigger and a popover trigger without the two fighting over the click.
+   */
   children: React.ReactNode
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 const TONES: AiTone[] = ['friendly', 'neutral', 'formal', 'apologetic']
@@ -61,11 +70,21 @@ export function AutoDraftOptions({
   onChange,
   onGenerate,
   children,
+  open,
+  onOpenChange,
 }: AutoDraftOptionsProps) {
+  const controlled = open !== undefined
+
   return (
-    <Popover>
-      <PopoverTrigger asChild>{children}</PopoverTrigger>
-      <PopoverContent align="end" side="top" className="w-[286px] p-3">
+    <Popover {...(controlled ? { open, onOpenChange } : {})}>
+      {controlled ? (
+        <PopoverAnchor asChild>{children}</PopoverAnchor>
+      ) : (
+        <PopoverTrigger asChild>{children}</PopoverTrigger>
+      )}
+      {/* Opens rightward from the icon. Anchored to a 34px button, `end` alignment threw the
+          panel off the left of the pane and over the folder rail. */}
+      <PopoverContent align="start" side="top" className="w-[286px] p-3">
         <Pills
           label="Tone"
           values={TONES}

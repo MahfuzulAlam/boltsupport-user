@@ -2,17 +2,19 @@ import { useCallback, useRef, useState } from 'react'
 import type { Editor } from '@tiptap/react'
 import {
   ChevronDown,
+  CircleCheck,
   Clock,
   Maximize2,
   Minimize2,
   Plus,
-  SendHorizontal,
+  ShieldCheck,
   Sparkles,
-  X,
+  Trash2,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,8 +25,11 @@ import { sendLaterPresets, snoozePresets } from '@/lib/when'
 import { useHotkeys } from '@/hooks/use-hotkeys'
 import { cn } from '@/lib/utils'
 import { useAiSettings } from '@/features/ai'
-import { ProvenanceRail } from '@/components/ProvenanceRail'
-import { useComposerDraft, type ComposerMode } from '../hooks/use-composer-draft'
+import {
+  restoreStoredDraft,
+  useComposerDraft,
+  type ComposerMode,
+} from '../hooks/use-composer-draft'
 import { useSendMessage } from '../hooks/use-send-message'
 import { MERGE_FIELDS } from '../merge-field'
 import { RecipientFields } from './RecipientFields'
@@ -52,6 +57,45 @@ const STATUS_LABEL: Record<SendStatus, string> = {
   active: 'Active',
   pending: 'Pending',
   closed: 'Closed',
+}
+
+/**
+ * One control in the pill riding the composer's top edge.
+ *
+ * A real tooltip rather than a `title`, because these are icons with no label and the native one
+ * takes a second to appear and cannot be styled to match. The hover fill is a full circle so the
+ * target reads as the size it actually is.
+ */
+function PillButton({
+  label,
+  ariaLabel,
+  pressed,
+  onClick,
+  children,
+}: {
+  label: string
+  ariaLabel?: string
+  pressed?: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onClick}
+          aria-label={ariaLabel ?? label}
+          {...(pressed === undefined ? {} : { 'aria-pressed': pressed })}
+          className="flex size-8 items-center justify-center rounded-full transition-colors hover:bg-[color:var(--hover)]"
+          style={{ color: 'var(--muted-foreground)' }}
+        >
+          {children}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top">{label}</TooltipContent>
+    </Tooltip>
+  )
 }
 
 function initials(name: string | undefined): string {
@@ -137,6 +181,7 @@ export function Composer({
    * under the pointer and the parser agrees with the row the agent is looking at.
    */
   const [openedAt, setOpenedAt] = useState(() => new Date())
+  const [draftPanelOpen, setDraftPanelOpen] = useState(false)
   const [draftOptions, setDraftOptions] = useState<DraftOptions>(DEFAULT_DRAFT_OPTIONS)
   const [check, setCheck] = useState<CheckResult | null>(null)
 
@@ -244,6 +289,33 @@ export function Composer({
     }
   }
 
+  /**
+   * Throw the draft away.
+   *
+   * Destructive and one click from the edge of the card, so it pairs with a real Undo rather than
+   * a confirmation dialog: the snapshot goes back to the same storage key the composer reads on
+   * open, which is what makes undoing survive the composer closing behind it.
+   */
+  const discard = () => {
+    const snapshot = { ...draft }
+    const hadContent = isDirty
+    clear()
+    editorRef.current?.commands.clearContent()
+    onClose?.()
+
+    if (hadContent) {
+      toast('Draft discarded', {
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            restoreStoredDraft(conversationId, snapshot)
+            toast('Draft restored', { description: 'Open the reply again to carry on.' })
+          },
+        },
+      })
+    }
+  }
+
   const runCheck = async () => {
     const text = draft.html.replace(/<[^>]*>/g, ' ').trim()
     if (text === '') return
@@ -315,48 +387,72 @@ export function Composer({
        * sitting in a row of their own, which buys the reply surface back the vertical space a
        * chrome row was taking.
        */}
+      {/*
+       * One even border on all four sides.
+       *
+       * The rail is gone from the composer, but what it encoded is not: the border itself takes
+       * the accent, so a note is still amber and an AI draft still violet all the way round.
+       * Provenance survives; only the thick left edge does.
+       */}
       <div
         className={cn(
-          'relative flex w-full gap-3.5 rounded-xl border py-3.5 pr-4 pl-0',
+          'relative flex w-full rounded-xl border px-4 py-3.5 transition-shadow',
+          /* Lifts while it has focus.
+             A composer is the one surface on this screen you are working *in* rather than
+             reading, so it earns a little elevation to say so, and drops back the moment you
+             click away. Focus within rather than a state flag: the editor, the fields and every
+             control in the row all count as being in it. */
+          'focus-within:shadow-[0_10px_28px_-12px_hsl(222_24%_11%/0.28)]',
+          'focus-within:ring-[3px] focus-within:ring-[color:var(--ring)]/35',
           expanded && 'min-h-0 flex-1',
         )}
+        data-composer-mode={draft.mode}
         style={{
           borderColor: isAiDraft ? 'var(--ai)' : isNote ? 'var(--warning)' : 'var(--border)',
           background: isAiDraft ? 'var(--ai-soft)' : isNote ? 'var(--note)' : 'var(--card)',
         }}
       >
-        <ProvenanceRail provenance={isAiDraft ? 'ai' : isNote ? 'note' : 'agent'} />
-
         {onClose !== undefined || onToggleExpand !== undefined ? (
           <div
             className="absolute -top-4 right-5 flex items-center gap-0.5 rounded-full border px-1 py-1 shadow-sm"
             style={{ borderColor: 'var(--border)', background: 'var(--card)' }}
           >
+            {/* Save and close first.
+
+                The draft is already written on every keystroke, so this button does not create
+                the safety, it makes it visible. Someone who has typed half a reply and needs to
+                move on wants to be told it is kept, not to infer it from an X. */}
+            {onClose !== undefined ? (
+              <PillButton
+                label="Save & close"
+                onClick={() => {
+                  if (isDirty) {
+                    toast('Saved as a draft', {
+                      description: 'It is waiting here when you come back.',
+                    })
+                  }
+                  onClose()
+                }}
+              >
+                <CircleCheck className="size-4" />
+              </PillButton>
+            ) : null}
+
             {onToggleExpand !== undefined ? (
-              <button
-                type="button"
+              <PillButton
+                label={expanded ? 'Back to the thread' : 'Fill the pane'}
+                ariaLabel={expanded ? 'Shrink the composer' : 'Expand the composer'}
+                pressed={expanded}
                 onClick={onToggleExpand}
-                aria-label={expanded ? 'Shrink the composer' : 'Expand the composer'}
-                aria-pressed={expanded}
-                title={expanded ? 'Back to the thread' : 'Fill the pane'}
-                className="flex size-7 items-center justify-center rounded-full hover:bg-[color:var(--hover)]"
-                style={{ color: 'var(--muted-foreground)' }}
               >
                 {expanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
-              </button>
+              </PillButton>
             ) : null}
 
             {onClose !== undefined ? (
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close the composer"
-                title="Close. The draft is kept."
-                className="flex size-7 items-center justify-center rounded-full hover:bg-[color:var(--hover)]"
-                style={{ color: 'var(--muted-foreground)' }}
-              >
-                <X className="size-4" />
-              </button>
+              <PillButton label="Discard this draft" onClick={discard}>
+                <Trash2 className="size-4" />
+              </PillButton>
             ) : null}
           </div>
         ) : null}
@@ -444,32 +540,64 @@ export function Composer({
               Aa
             </button>
 
-            {aiEnabled && !isNote ? (
+            {/* One AI control, not two labels competing with Insert for the row. The panel that
+                asks for tone and length hangs off this same button, so choosing Draft with AI
+                lands where the eye already is. */}
+            {isNote ? null : (
               <AutoDraftOptions
                 options={draftOptions}
                 onChange={setDraftOptions}
                 onGenerate={() => void autoDraft.generate(draftOptions, draft.html)}
+                open={draftPanelOpen}
+                onOpenChange={setDraftPanelOpen}
               >
-                <button
-                  type="button"
-                  className="flex h-[34px] items-center gap-1.5 rounded-full px-3 text-[14px]"
-                  style={{ background: 'var(--ai-soft)', color: 'var(--ai)' }}
-                >
-                  <Sparkles className="size-4" />
-                  Draft with AI
-                </button>
+                <div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="AI actions"
+                        title="AI actions"
+                        className="flex size-[34px] items-center justify-center rounded-full"
+                        style={{ background: 'var(--ai-soft)', color: 'var(--ai)' }}
+                      >
+                        <Sparkles className="size-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" side="top" className="w-[190px]">
+                      {aiEnabled ? (
+                        <>
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              setDraftPanelOpen(true)
+                            }}
+                          >
+                            <Sparkles className="size-3.5" style={{ color: 'var(--ai)' }} />
+                            <span style={{ color: 'var(--ai)' }}>Draft with AI</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={!isDirty}
+                            onSelect={() => {
+                              void runCheck()
+                            }}
+                          >
+                            <ShieldCheck className="size-3.5" style={{ color: 'var(--ai)' }} />
+                            <span style={{ color: 'var(--ai)' }}>Check reply</span>
+                          </DropdownMenuItem>
+                        </>
+                      ) : (
+                        <p
+                          className="px-2 py-1.5 text-[13px]"
+                          style={{ color: 'var(--muted-foreground)' }}
+                        >
+                          AI features are turned off for this workspace.
+                        </p>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </AutoDraftOptions>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={() => void runCheck()}
-              disabled={!isDirty}
-              className="h-[34px] rounded-full px-3 text-[14px] disabled:opacity-45"
-              style={{ color: 'var(--muted-foreground)' }}
-            >
-              Check reply
-            </button>
+            )}
 
             {autoDraft.isUnedited ? (
               <span
@@ -578,22 +706,8 @@ export function Composer({
                 </button>
               ) : null}
 
-              {!isNote ? (
-                <button
-                  type="button"
-                  aria-label="Send later"
-                  title="Send later"
-                  onClick={() => {
-                    setOpenedAt(new Date())
-                    setScheduling(true)
-                  }}
-                  className="flex size-[34px] items-center justify-center rounded-full"
-                  style={{ background: 'var(--muted)', color: 'var(--foreground)' }}
-                >
-                  <SendHorizontal className="size-4" />
-                </button>
-              ) : null}
-
+              {/* No Send later icon here: it already lives in the Send menu, and one action
+                  reachable two ways from the same row is a row that reads as longer than it is. */}
               <SplitSendButton
                 label={isNote ? 'Add note' : isForward ? 'Forward' : 'Send'}
                 action={isNote ? 'Add note' : isForward ? 'Forward' : 'Send reply'}

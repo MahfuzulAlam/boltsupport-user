@@ -76,7 +76,7 @@ export default defineConfig({
      * and unrelated files start timing out. Fewer workers with real CPU each is both faster
      * end to end and stable.
      */
-    maxWorkers: 4,
+    maxWorkers: 3,
     testTimeout: 20_000,
     hookTimeout: 20_000,
     include: ['src/**/*.{test,spec}.{ts,tsx}'],

@@ -7,8 +7,15 @@ import { useSidebar } from '@/features/inbox'
 import { useThreadView } from '../hooks/use-thread-view'
 import { ConversationPage } from './ConversationPage'
 
-/** The composer arrives as a lazy chunk, so waiting for it needs more than the 1s default. */
-const LAZY = { timeout: 8000 }
+/*
+ * The composer arrives as a lazy chunk, so waiting for it needs more than the 1s default.
+ *
+ * Generous rather than tight: several suites mount this page, and every one of them pulls the
+ * same Tiptap import. Under a full parallel run that queue is long enough that 8s occasionally
+ * lost. A `findBy` resolves the moment the element appears, so a high ceiling costs nothing when
+ * the machine is quiet and buys a stable suite when it is not.
+ */
+const LAZY = { timeout: 20_000 }
 
 function renderConversation(route = '/inbox/in1/assigned/c2') {
   return renderWithProviders(
@@ -155,9 +162,14 @@ describe('the conversation menu', () => {
 
     await user.click(within(await openMenu(user)).getByRole('menuitem', { name: /^follow/i }))
 
-    await waitFor(async () => {
-      const menu = await openMenu(user)
-      expect(within(menu).getByRole('menuitem', { name: /^unfollow/i })).toBeInTheDocument()
-    })
+    /*
+     * Open once, then let findBy retry on the item.
+     *
+     * Reopening the menu inside a waitFor retry re-toggles it on every attempt, which is how this
+     * test failed under a loaded parallel run while passing on its own. The wait belongs on the
+     * assertion, never on the interaction.
+     */
+    await openMenu(user)
+    expect(await screen.findByRole('menuitem', { name: /^unfollow/i })).toBeInTheDocument()
   })
 })

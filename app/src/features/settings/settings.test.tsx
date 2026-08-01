@@ -9,7 +9,7 @@ import { PermissionsPage } from './components/PermissionsPage'
 import { OutgoingEmailPage } from './components/OutgoingEmailPage'
 import { InboxHoursPage } from './components/InboxHoursPage'
 import { SatisfactionRatingsPage } from './components/SatisfactionRatingsPage'
-import { NotificationsPage } from './components/ManagePages'
+import { NotificationsPage } from './components/NotificationsPage'
 import { OnboardingStepper } from './components/OnboardingStepper'
 
 /** The pages that own a save bar. Read-only lists deliberately have none. */
@@ -137,12 +137,16 @@ describe('notification preferences', () => {
     const user = userEvent.setup()
     renderWithProviders(<NotificationsPage />)
 
-    const toggle = await screen.findByRole('switch', { name: /assigned to me by email/i })
-    await user.click(toggle)
+    // Three independent channels per row, so the name says which one is being changed.
+    const mobile = await screen.findByRole('checkbox', {
+      name: /mobile: a conversation is assigned to me/i,
+    })
+    expect(mobile).toBeChecked()
+    await user.click(mobile)
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
     await waitFor(() => {
-      expect(getDb().notificationPrefs.events['Assigned to me']?.email).toBe(false)
+      expect(getDb().notificationPrefs.events['assigned-to-me']?.mobile).toBe(false)
     })
   })
 })

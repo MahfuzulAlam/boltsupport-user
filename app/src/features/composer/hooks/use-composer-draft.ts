@@ -69,6 +69,21 @@ export function hasStoredDraft(conversationId: string): boolean {
   )
 }
 
+/**
+ * Puts a discarded draft back.
+ *
+ * Undo has to survive the composer closing, and by then the hook's state is gone with it. Writing
+ * straight to the same key means the draft is there again the moment the composer is reopened,
+ * which is what "undo" has to mean for an action whose whole point was to leave.
+ */
+export function restoreStoredDraft(conversationId: string, draft: ComposerDraft): void {
+  try {
+    localStorage.setItem(storageKey(conversationId), JSON.stringify(draft))
+  } catch {
+    // A blocked write costs the restore, not the app.
+  }
+}
+
 export function useComposerDraft(
   conversationId: string,
   initialMode?: ComposerMode,

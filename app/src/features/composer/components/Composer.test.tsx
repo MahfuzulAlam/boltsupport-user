@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/render'
@@ -19,7 +19,9 @@ describe('the composer', () => {
   it('makes a note unmistakable from a reply', async () => {
     const reply = renderWithProviders(<Composer conversationId="c1" recipient="Maya Chen" />)
 
-    expect(document.querySelector('[data-provenance="agent"]')).toBeInTheDocument()
+    const asReply = document.querySelector<HTMLElement>('[data-composer-mode]')
+    expect(asReply?.getAttribute('data-composer-mode')).toBe('reply')
+    expect(asReply?.style.borderColor).toBe('var(--border)')
     expect(screen.getByRole('button', { name: /send reply/i })).toBeInTheDocument()
     reply.unmount()
 
@@ -27,10 +29,17 @@ describe('the composer', () => {
     // actually arrives on screen.
     renderWithProviders(<Composer conversationId="c1" recipient="Maya Chen" initialMode="note" />)
 
-    // The rail, the send label, and the field's accessible name all change together. One cue is
-    // not enough to stop an internal note reaching a customer (FR-3.1, FR-3.2).
-    expect(document.querySelector('[data-provenance="note"]')).toBeInTheDocument()
-    expect(document.querySelector('[data-provenance="agent"]')).not.toBeInTheDocument()
+    /*
+     * Four cues move together, and none of them is the rail any more.
+     *
+     * The rail came out of the composer when the border became even on all four sides, so the
+     * border itself now carries the amber. One cue is never enough to stop an internal note
+     * reaching a customer (FR-3.1, FR-3.2), which is why this checks all of them.
+     */
+    const asNote = document.querySelector<HTMLElement>('[data-composer-mode]')
+    expect(asNote?.getAttribute('data-composer-mode')).toBe('note')
+    expect(asNote?.style.borderColor).toBe('var(--warning)')
+    expect(asNote?.style.background).toBe('var(--note)')
     expect(screen.getByRole('button', { name: /add note/i })).toBeInTheDocument()
     expect(await screen.findByLabelText(/internal note body/i)).toBeInTheDocument()
     expect(screen.getByText(/internal only/i)).toBeInTheDocument()
@@ -67,6 +76,27 @@ describe('the composer', () => {
   it('does not let an empty reply be sent', async () => {
     renderWithProviders(<Composer conversationId="c1" recipient="Maya Chen" />)
     expect(await screen.findByRole('button', { name: /send reply/i })).toBeDisabled()
+  })
+
+  it('carries save, expand and discard on the top edge', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    renderWithProviders(
+      <Composer
+        conversationId="c1"
+        recipient="Maya Chen"
+        onClose={onClose}
+        onToggleExpand={vi.fn()}
+      />,
+    )
+
+    for (const name of [/save & close/i, /expand the composer/i, /discard this draft/i]) {
+      expect(screen.getByRole('button', { name })).toBeInTheDocument()
+    }
+
+    await user.click(screen.getByRole('button', { name: /save & close/i }))
+    // Saving is what closing already did; the button exists to say so out loud.
+    expect(onClose).toHaveBeenCalledOnce()
   })
 
   it('offers the insert menu with its shortcuts', async () => {

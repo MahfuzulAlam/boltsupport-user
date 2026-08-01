@@ -636,3 +636,45 @@ export function updateNotificationPrefs(patch: Partial<SeedData['notificationPre
   db.notificationPrefs = { ...db.notificationPrefs, ...patch }
   return db.notificationPrefs
 }
+
+/* Connected apps ------------------------------------------------------------------------- */
+
+export function updateConnectedApp(
+  id: string,
+  patch: { name?: string; redirectUrl?: string },
+): SeedData['connectedApps'][number] | undefined {
+  const index = db.connectedApps.findIndex((app) => app.id === id)
+  const existing = db.connectedApps[index]
+  if (existing === undefined) return undefined
+
+  const updated = { ...existing, ...patch }
+  db.connectedApps[index] = updated
+  return updated
+}
+
+/**
+ * Registers a new app.
+ *
+ * The id and the secret are generated here rather than supplied, because a client that can name
+ * its own credentials can also name one that already exists.
+ */
+export function addConnectedApp(name: string): SeedData['connectedApps'][number] {
+  const suffix = String(db.connectedApps.length + 1).padStart(2, '0')
+  const created = {
+    id: `app-${suffix}-${String(db.connectedApps.length)}`,
+    name,
+    appId: `Bs${suffix}${'AKQZmXpLvNrTcHdWyEsGfJuBoi'.slice(0, 30)}`,
+    secret: `Sk${suffix}${'RwMhCkXbZtLnQeYsVdJfGaUoNi'.slice(0, 30)}`,
+    redirectUrl: '',
+    createdAt: new Date().toISOString(),
+  }
+  db.connectedApps.push(created)
+  return created
+}
+
+export function removeConnectedApp(id: string): boolean {
+  const index = db.connectedApps.findIndex((app) => app.id === id)
+  if (index === -1) return false
+  db.connectedApps.splice(index, 1)
+  return true
+}

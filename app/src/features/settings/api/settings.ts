@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import {
   autoReplySchema,
+  connectedAppSchema,
   customFieldSchema,
   inboxHoursSchema,
   inboxPermissionsSchema,
@@ -91,4 +92,24 @@ export function fetchTags(signal?: AbortSignal) {
 
 export function fetchSavedReplies(signal?: AbortSignal) {
   return apiRequest('/saved-replies', z.array(savedReplySchema), { ...(signal ? { signal } : {}) })
+}
+
+export function fetchConnectedApps(signal?: AbortSignal) {
+  return apiRequest('/account/apps', z.array(connectedAppSchema), { ...(signal ? { signal } : {}) })
+}
+
+export function fetchConnectedApp(id: string, signal?: AbortSignal) {
+  return apiRequest(`/account/apps/${id}`, connectedAppSchema, { ...(signal ? { signal } : {}) })
+}
+
+export function patchConnectedApp(id: string, patch: { name?: string; redirectUrl?: string }) {
+  return apiRequest(`/account/apps/${id}`, connectedAppSchema, { method: 'PATCH', body: patch })
+}
+
+export function createConnectedApp(name: string) {
+  return apiRequest('/account/apps', connectedAppSchema, { method: 'POST', body: { name } })
+}
+
+export function deleteConnectedApp(id: string) {
+  return apiRequest(`/account/apps/${id}`, z.unknown(), { method: 'DELETE' })
 }

@@ -3,6 +3,7 @@ import { aiAgent, aiSettings } from './ai-config'
 import { routing, slaPolicies, workflows } from './automation'
 import {
   autoReply,
+  connectedApps,
   customFields,
   inboxHours,
   inboxPermissions,
@@ -55,6 +56,7 @@ export function createSeedData() {
     teams: structuredClone(teams),
     integrations: structuredClone(integrations),
     notificationPrefs: structuredClone(notificationPrefs),
+    connectedApps: structuredClone(connectedApps),
     aiSettings: structuredClone(aiSettings),
     aiAgent: structuredClone(aiAgent),
     ...generated,

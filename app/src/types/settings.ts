@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { idSchema } from './common'
+import { idSchema, isoDateSchema } from './common'
 
 /**
  * Per-inbox configuration.
@@ -105,9 +105,47 @@ export const integrationSchema = z.object({
 })
 export type Integration = z.infer<typeof integrationSchema>
 
+/**
+ * Where a notification can land.
+ *
+ * Three independent channels rather than one preference, because they answer different
+ * questions: email is for when you are not here, browser for when you are, and mobile for the
+ * things worth interrupting a walk for.
+ */
+export const notificationChannelsSchema = z.object({
+  email: z.boolean(),
+  mobile: z.boolean(),
+  browser: z.boolean(),
+})
+export type NotificationChannels = z.infer<typeof notificationChannelsSchema>
+
 export const notificationPrefsSchema = z.object({
-  /** Per event: browser, email, or neither. */
-  events: z.record(z.string(), z.object({ browser: z.boolean(), email: z.boolean() })),
+  /**
+   * Default applies one set of choices to every inbox. Custom is per inbox, which only earns its
+   * complexity for someone who genuinely works two very different queues.
+   */
+  method: z.enum(['default', 'custom']).default('default'),
+  /** Keyed by event id, so a renamed label never orphans somebody's saved choice. */
+  events: z.record(z.string(), notificationChannelsSchema),
   digest: z.enum(['off', 'daily', 'weekly']),
 })
 export type NotificationPrefs = z.infer<typeof notificationPrefsSchema>
+
+/**
+ * An OAuth app somebody on the team registered against the API.
+ *
+ * The secret lives on the record because the person who created the app is the only one who can
+ * see it, and they need it once to configure their integration. It is never rendered by default,
+ * only on request: a credential sitting in plain sight on a settings page is one screen share
+ * away from being everybody's.
+ */
+export const connectedAppSchema = z.object({
+  id: idSchema,
+  name: z.string().min(1),
+  /** The public identifier, safe to show and copy. */
+  appId: z.string(),
+  secret: z.string(),
+  redirectUrl: z.string(),
+  createdAt: isoDateSchema,
+})
+export type ConnectedApp = z.infer<typeof connectedAppSchema>

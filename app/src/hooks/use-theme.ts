@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { reapplyAccent } from './use-accent'
 
 export type Theme = 'light' | 'dark'
 
@@ -49,6 +50,8 @@ export const useTheme = create<ThemeState>()((set, get) => ({
   theme: resolveInitialTheme(),
   setTheme: (theme) => {
     applyTheme(theme)
+    // Each accent has a light and a dark value, so flipping the mode has to recompute it.
+    reapplyAccent()
     try {
       localStorage.setItem(STORAGE_KEY, theme)
     } catch {

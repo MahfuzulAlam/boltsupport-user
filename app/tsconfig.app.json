@@ -1,0 +1,40 @@
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "target": "es2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "esnext",
+    "types": ["vite/client", "@testing-library/jest-dom"],
+    "allowArbitraryExtensions": true,
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Path aliases. Feature slices import through these, never with ../../..
+       No baseUrl: TypeScript 6 deprecates it, and paths already resolve relative
+       to this file. */
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
+    /* Strictness. PRD 10.3 requires strict with no `any` and no non null assertions.
+       noUncheckedIndexedAccess is on because this codebase indexes seed arrays and
+       virtualized row windows constantly, and an out of range read should be a type
+       error rather than a runtime undefined. */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,390 @@
+/* BoltSupport design tokens.
+ *
+ * Source of truth: the :root block is byte identical across all five design prototypes in
+ * design-files/frontend/*.dc.html, cross checked against prd/boltsupport-prd.md section 9.
+ * The prototypes carry tokens the PRD never lists (--chrome for the dark top bar, --app for
+ * the page ground behind cards, and the pre baked -soft alpha variants). Those are real and
+ * load bearing, so they live here alongside the documented ones.
+ *
+ * Three accent colors, three meanings, no overlap: cobalt --brand for links, active nav and
+ * focus; violet --ai for AI generated or proposed content and nothing else; amber --note plus
+ * --warning for internal notes. Spending any of them elsewhere destroys the signal.
+ */
+
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+/* Self hosted faces. No CDN, so the CSP in NFR-2.11 needs no font origin. */
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+@import '@fontsource/instrument-serif/400.css';
+
+/* The prototypes flip themes with data-theme="dark"; shadcn and Tailwind expect a class.
+   Accept both so ported prototype markup and generated components agree. */
+@custom-variant dark (&:where(.dark, .dark *, [data-theme='dark'], [data-theme='dark'] *));
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces */
+  --background: hsl(0 0% 100%);
+  --app: hsl(220 20% 98%);
+  --card: hsl(0 0% 100%);
+  --popover: hsl(0 0% 100%);
+  --muted: hsl(220 14% 96%);
+  --hover: hsl(220 14% 96%);
+  --border: hsl(220 13% 91%);
+  --input: hsl(220 13% 91%);
+  --scrim: hsl(222 24% 11% / 0.38);
+
+  /* Ink */
+  --foreground: hsl(222 24% 11%);
+  --card-foreground: hsl(222 24% 11%);
+  --popover-foreground: hsl(222 24% 11%);
+  --muted-foreground: hsl(220 9% 44%);
+  --primary: hsl(222 24% 11%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(220 14% 96%);
+  --secondary-foreground: hsl(222 24% 11%);
+  --accent: hsl(220 14% 96%);
+  --accent-foreground: hsl(222 24% 11%);
+
+  /* Cobalt brand: links, active nav, focus ring, the bolt mark.
+     52% rather than 55% so brand text clears AA on its own soft tint (NFR-3.1). */
+  --brand: hsl(222 89% 52%);
+  --brand-soft: hsl(222 89% 52% / 0.1);
+  --ring: hsl(222 89% 52%);
+
+  /* Dark top bar chrome. Not in the PRD token table but used on every screen. */
+  --chrome: hsl(226 46% 20%);
+  --chrome-foreground: hsl(0 0% 100% / 0.84);
+  --chrome-hover: hsl(0 0% 100% / 0.1);
+  --chrome-line: hsl(0 0% 100% / 0.16);
+
+  /* Semantic.
+     Each has a fill and a -strong text variant. The fills are tuned to look right as a dot, a
+     bar, or a rail; the same value used as 13px text on white lands around 3:1 and fails AA.
+     Rather than darken the fills and make them muddy, text uses the strong variant. This is the
+     rule --warning-strong already followed, generalised. */
+  --success: hsl(152 62% 40%);
+  --success-strong: hsl(152 62% 28%);
+  --success-soft: hsl(152 62% 40% / 0.16);
+  --warning: hsl(38 92% 50%);
+  --warning-strong: hsl(35 92% 32%);
+  --danger: hsl(0 72% 51%);
+  --danger-strong: hsl(0 72% 44%);
+  --danger-soft: hsl(0 72% 51% / 0.12);
+  --destructive: hsl(0 72% 51%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --info: hsl(199 89% 48%);
+
+  /* Internal note amber. --note is the fill, --warning is the rail and border. */
+  --note: hsl(45 96% 91%);
+
+  /* AI violet. Reserved exclusively for AI generated or AI proposed content. */
+  --ai: hsl(268 74% 58%);
+  --ai-soft: hsl(268 74% 58% / 0.07);
+
+  --shadow-md: 0 8px 24px hsl(222 24% 11% / 0.14);
+}
+
+.dark,
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --background: hsl(224 26% 8%);
+  --app: hsl(224 26% 8%);
+  --card: hsl(224 22% 11%);
+  --popover: hsl(224 22% 11%);
+  --muted: hsl(224 18% 15%);
+  --hover: hsl(224 18% 15%);
+  --border: hsl(224 16% 19%);
+  --input: hsl(224 16% 19%);
+  --scrim: hsl(224 30% 4% / 0.58);
+
+  --foreground: hsl(210 20% 96%);
+  --card-foreground: hsl(210 20% 96%);
+  --popover-foreground: hsl(210 20% 96%);
+  --muted-foreground: hsl(218 11% 65%);
+  --primary: hsl(210 20% 96%);
+  --primary-foreground: hsl(224 26% 8%);
+  --secondary: hsl(224 18% 15%);
+  --secondary-foreground: hsl(210 20% 96%);
+  --accent: hsl(224 18% 15%);
+  --accent-foreground: hsl(210 20% 96%);
+
+  --brand: hsl(218 92% 68%);
+  --brand-soft: hsl(218 92% 68% / 0.16);
+  --ring: hsl(218 92% 68%);
+
+  --chrome: hsl(224 24% 12%);
+  --chrome-foreground: hsl(210 20% 92%);
+  --chrome-hover: hsl(0 0% 100% / 0.08);
+  --chrome-line: hsl(0 0% 100% / 0.12);
+
+  /* On a dark ground the strong variants go lighter, not darker. */
+  --success-strong: hsl(152 58% 62%);
+  --success-soft: hsl(152 62% 40% / 0.22);
+  --warning-strong: hsl(38 92% 62%);
+  --danger-strong: hsl(0 80% 70%);
+  --danger-soft: hsl(0 72% 51% / 0.2);
+
+  --note: hsl(42 88% 18% / 0.55);
+
+  --ai: hsl(268 80% 72%);
+  --ai-soft: hsl(268 80% 72% / 0.1);
+
+  --shadow-md: 0 8px 24px hsl(224 30% 3% / 0.5);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-app: var(--app);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-hover: var(--hover);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-scrim: var(--scrim);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+
+  --color-chrome: var(--chrome);
+  --color-chrome-foreground: var(--chrome-foreground);
+  --color-chrome-hover: var(--chrome-hover);
+  --color-chrome-line: var(--chrome-line);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-strong: var(--warning-strong);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-info: var(--info);
+  --color-note: var(--note);
+  --color-ai: var(--ai);
+  --color-ai-soft: var(--ai-soft);
+
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  /* Instrument Serif appears in exactly two places, both 36px zero state headlines:
+     the AI Agent landing and the SLA zero state. Nowhere else. */
+  --font-serif: 'Instrument Serif', Georgia, serif;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-pill: 14px;
+
+  /* Density anchors. PRD section 9.4 and FR-1.10, measured against the prototypes. */
+  --spacing-topbar: 56px;
+  --spacing-row: 72px;
+  --spacing-row-comfortable: 84px;
+  --spacing-sidebar-row: 40px;
+  --spacing-sidebar: 244px;
+  --spacing-rail: 326px;
+  --spacing-preview: 412px;
+  --spacing-reading: 760px;
+  --spacing-content: 960px;
+  --spacing-dashboard: 1240px;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  /*
+   * Every border defaults to the border token.
+   *
+   * Tailwind v4 resolves a bare `border` to `currentColor` rather than to a neutral, so a popup
+   * with `rounded-md border` drew its edge in whatever the text colour happened to be: menus and
+   * dialogs came out with a near black outline that belongs to no part of the palette. Setting
+   * the default here fixes every surface at once instead of leaving each component to remember
+   * an explicit colour, and it stays in the base layer so any `border-<color>` utility, or an
+   * inline style, still wins where a border is meant to carry meaning.
+   */
+  *,
+  *::before,
+  *::after,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--border);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--app);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    /* 14px base with 1.5 line height is the root of the density scale. */
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Focus is always visible and always the brand ring. NFR-3.2. */
+  *:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--brand-soft);
+  }
+
+  /* Machine produced quantities line up in columns, so mono is always tabular. */
+  code,
+  kbd,
+  samp {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /*
+   * NFR-3.6: reduced motion drops transforms and keeps opacity transitions only.
+   *
+   * Deliberately not the usual blanket `transition-duration: 0` reset. Movement is what causes
+   * discomfort; a cross fade does not, and it is the thing that still tells you a panel opened
+   * or a toast arrived. Killing every transition alongside the transforms removes the one cue
+   * that survives, so opacity keeps a short duration and everything else is pinned.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      /*
+       * Only opacity may transition, so nothing slides, scales, or spins. `transform` itself is
+       * left alone: the virtualized queue positions every row with translateY, and nulling the
+       * property would stack the whole list on top of itself.
+       */
+      transition-property: opacity !important;
+      transition-duration: 120ms !important;
+    }
+  }
+}
+
+@utility font-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@layer components {
+  /* Keyboard chips. 11px is the hard type floor from NFR-3.7, and only these plus micro
+     labels are allowed to use it. */
+  .kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: var(--radius-sm);
+    background: var(--muted);
+    color: var(--muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  /* A merge field in the composer. An indivisible chip, so it cannot be half deleted into
+     literal punctuation on its way to a customer. */
+  .merge-field {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: var(--radius-sm);
+    background: var(--brand-soft);
+    color: var(--brand);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  /* Tiptap renders the placeholder as a data attribute on the first empty paragraph. */
+  .tiptap p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    pointer-events: none;
+    color: var(--muted-foreground);
+  }
+
+  /* Section eyebrow: 12px, 600, uppercase, wide tracking. */
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+}
+
+@keyframes popin {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fadeup {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes slidein {
+  from {
+    transform: translateX(-12px);
+  }
+  to {
+    transform: none;
+  }
+}

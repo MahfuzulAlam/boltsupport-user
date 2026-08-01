@@ -1,0 +1,8 @@
+export { fetchAiSettings, fetchAiAgent, fetchAiInboxStats, type AiInboxStats } from './api/ai'
+export { useAiSettings, useAiAgent, useAiInboxStats } from './hooks/use-ai'
+export { useAiSummary } from './hooks/use-ai-summary'
+export { SatisfactionDot } from './components/SatisfactionDot'
+export { AiSurface } from './components/AiSurface'
+export { AiSummaryPanel } from './components/AiSummaryPanel'
+export { AiSuggestionStrip } from './components/AiSuggestionStrip'
+export { PredictedSatisfactionPanel } from './components/PredictedSatisfactionPanel'

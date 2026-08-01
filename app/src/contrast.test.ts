@@ -1,0 +1,185 @@
+import { describe, expect, it } from 'vitest'
+
+/**
+ * NFR-3.1: WCAG 2.1 AA contrast on all text and meaningful UI.
+ *
+ * axe cannot judge this under jsdom, which has no layout engine and reports every computed
+ * colour as transparent. So the token sheet is checked directly: every pairing the product
+ * actually renders, in both themes, against the ratio its size demands.
+ *
+ * This catches the class of mistake that produced `--warning-strong`: amber that looks fine in a
+ * design tool and fails against white the moment it is used as body text.
+ */
+
+// Read through Vite rather than node:fs: under the test runner the module URL is an http one,
+// and the lint rules ban node built-ins in tests for the same reason.
+const SHEETS: Record<string, string> = import.meta.glob('/src/index.css', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+})
+const CSS = SHEETS['/src/index.css'] ?? ''
+
+/** Pulls a token's value out of a `:root`-style block. */
+function tokens(blockStart: string): Record<string, string> {
+  const from = CSS.indexOf(blockStart)
+  if (from === -1) throw new Error(`No block ${blockStart} in index.css`)
+  const to = CSS.indexOf('\n}', from)
+  const block = CSS.slice(from, to)
+
+  const found: Record<string, string> = {}
+  for (const match of block.matchAll(/^\s*(--[\w-]+):\s*([^;]+);/gm)) {
+    found[match[1] ?? ''] = (match[2] ?? '').trim()
+  }
+  return found
+}
+
+const LIGHT = tokens(':root {')
+// The dark block overrides only what changes; everything else cascades from :root, so the dark
+// sheet is the light one with those overrides laid on top.
+const DARK = { ...LIGHT, ...tokens(".dark,\n[data-theme='dark'] {") }
+
+interface Rgb {
+  r: number
+  g: number
+  b: number
+  a: number
+}
+
+/** Parses `hsl(H S% L%)` and `hsl(H S% L% / A)`, the only colour form the sheet uses. */
+function parseHsl(value: string): Rgb {
+  const match = /hsl\(\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%\s*(?:\/\s*([\d.]+))?\s*\)/.exec(value)
+  if (match === null) throw new Error(`Not an hsl() value: ${value}`)
+
+  const h = Number(match[1]) / 360
+  const s = Number(match[2]) / 100
+  const l = Number(match[3]) / 100
+  const a = match[4] === undefined ? 1 : Number(match[4])
+
+  if (s === 0) return { r: l * 255, g: l * 255, b: l * 255, a }
+
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+  const p = 2 * l - q
+  const channel = (t: number) => {
+    let value = t
+    if (value < 0) value += 1
+    if (value > 1) value -= 1
+    if (value < 1 / 6) return p + (q - p) * 6 * value
+    if (value < 1 / 2) return q
+    if (value < 2 / 3) return p + (q - p) * (2 / 3 - value) * 6
+    return p
+  }
+
+  return {
+    r: channel(h + 1 / 3) * 255,
+    g: channel(h) * 255,
+    b: channel(h - 1 / 3) * 255,
+    a,
+  }
+}
+
+/** Flattens a translucent colour onto its background, which is what the eye actually sees. */
+function over(foreground: Rgb, background: Rgb): Rgb {
+  return {
+    r: foreground.r * foreground.a + background.r * (1 - foreground.a),
+    g: foreground.g * foreground.a + background.g * (1 - foreground.a),
+    b: foreground.b * foreground.a + background.b * (1 - foreground.a),
+    a: 1,
+  }
+}
+
+function relativeLuminance({ r, g, b }: Rgb): number {
+  const channel = (value: number) => {
+    const scaled = value / 255
+    return scaled <= 0.039_28 ? scaled / 12.92 : ((scaled + 0.055) / 1.055) ** 2.4
+  }
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+}
+
+/**
+ * Contrast of text over a background, which may itself be a tint over a surface.
+ *
+ * The three-layer case is the one that matters: `--success-soft` is a 16% wash, so a chip is
+ * really text over (tint over card). Treating the tint as opaque measures a colour nobody sees
+ * and reports a ratio that is wrong in both directions.
+ */
+function ratio(foreground: string, background: string, base?: string): number {
+  const surface =
+    base === undefined ? parseHsl(background) : over(parseHsl(background), parseHsl(base))
+  const fg = over(parseHsl(foreground), surface)
+  const light = Math.max(relativeLuminance(fg), relativeLuminance(surface))
+  const dark = Math.min(relativeLuminance(fg), relativeLuminance(surface))
+  return (light + 0.05) / (dark + 0.05)
+}
+
+/** AA: 4.5 for body text, 3.0 for large text and meaningful non-text UI. */
+const PAIRINGS: { fg: string; bg: string; base?: string; min: number; where: string }[] = [
+  { fg: '--foreground', bg: '--background', min: 4.5, where: 'body text' },
+  { fg: '--foreground', bg: '--card', min: 4.5, where: 'text on a card' },
+  { fg: '--foreground', bg: '--app', min: 4.5, where: 'text on the app ground' },
+  { fg: '--foreground', bg: '--muted', min: 4.5, where: 'text on a muted fill' },
+  { fg: '--muted-foreground', bg: '--background', min: 4.5, where: 'secondary text' },
+  { fg: '--muted-foreground', bg: '--card', min: 4.5, where: 'secondary text on a card' },
+  { fg: '--muted-foreground', bg: '--muted', min: 4.5, where: 'secondary text on a muted fill' },
+  { fg: '--brand', bg: '--background', min: 4.5, where: 'links' },
+  { fg: '--brand', bg: '--card', min: 4.5, where: 'links on a card' },
+  { fg: '--brand', bg: '--brand-soft', base: '--card', min: 4.5, where: 'active nav item' },
+  { fg: '--ai', bg: '--card', min: 4.5, where: 'AI headings' },
+  { fg: '--ai', bg: '--ai-soft', base: '--card', min: 4.5, where: 'AI text on its own tint' },
+  { fg: '--success-strong', bg: '--card', min: 4.5, where: 'success text' },
+  { fg: '--success-strong', bg: '--success-soft', base: '--card', min: 4.5, where: 'success chip' },
+  { fg: '--danger-strong', bg: '--card', min: 4.5, where: 'danger text' },
+  {
+    fg: '--danger-strong',
+    bg: '--danger-soft',
+    base: '--card',
+    min: 4.5,
+    where: 'breached SLA chip',
+  },
+  // The fills themselves only have to be distinguishable as non-text UI.
+  { fg: '--success', bg: '--card', min: 3, where: 'success dot' },
+  { fg: '--danger', bg: '--card', min: 3, where: 'danger dot' },
+  { fg: '--warning', bg: '--card', min: 1.4, where: 'warning rail' },
+  { fg: '--warning-strong', bg: '--card', min: 4.5, where: 'at risk SLA text' },
+  { fg: '--warning-strong', bg: '--note', min: 4.5, where: 'note text on the amber fill' },
+  { fg: '--chrome-foreground', bg: '--chrome', min: 4.5, where: 'top bar nav' },
+  { fg: '--primary-foreground', bg: '--primary', min: 4.5, where: 'primary button label' },
+  { fg: '--destructive-foreground', bg: '--destructive', min: 4.5, where: 'destructive button' },
+  // Meaningful non-text UI: a focus ring nobody can see is a focus ring that does not exist.
+  { fg: '--ring', bg: '--background', min: 3, where: 'focus ring' },
+  { fg: '--ring', bg: '--card', min: 3, where: 'focus ring on a card' },
+  { fg: '--border', bg: '--background', min: 1.2, where: 'separators' },
+]
+
+describe.each([
+  { theme: 'light', sheet: LIGHT },
+  { theme: 'dark', sheet: DARK },
+])('$theme theme contrast', ({ sheet }) => {
+  it.each(PAIRINGS)('$where meets $min:1', ({ fg, bg, base, min }) => {
+    const foreground = sheet[fg]
+    const background = sheet[bg]
+    expect(foreground, `${fg} is missing`).toBeDefined()
+    expect(background, `${bg} is missing`).toBeDefined()
+
+    const measured = ratio(
+      foreground as string,
+      background as string,
+      base === undefined ? undefined : sheet[base],
+    )
+    expect(
+      Number(measured.toFixed(2)),
+      `${fg} on ${bg} measured ${measured.toFixed(2)}:1`,
+    ).toBeGreaterThanOrEqual(min)
+  })
+})
+
+describe('the type scale', () => {
+  it('never goes below 11px', () => {
+    // NFR-3.7. 11px is reserved for keyboard chips and micro labels; anything smaller is not
+    // readable at arm's length on a laptop.
+    const sizes = [...CSS.matchAll(/font-size:\s*(\d+)px/g)].map((match) => Number(match[1]))
+    for (const size of sizes) {
+      expect(size).toBeGreaterThanOrEqual(11)
+    }
+  })
+})

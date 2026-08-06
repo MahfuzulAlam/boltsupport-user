@@ -1,71 +1,56 @@
 import { describe, expect, it } from 'vitest'
 import { matchPath } from 'react-router-dom'
 import { STUB_ROUTES } from './route-config'
+import { router } from './router'
 import { buildPrimaryNav, navToPaletteItems } from '@/features/app'
+import { ACCOUNT_NAV_GROUPS, inboxSettingsNav } from '@/features/settings/nav'
 import { createSeedData } from '@/mocks/seed'
 
 const seed = createSeedData()
 const nav = buildPrimaryNav(seed.inboxes, 'in1')
 
-/** Every path the router can serve. Kept in sync with router.tsx by construction. */
+interface RouteNode {
+  path?: string
+  children?: readonly RouteNode[]
+}
+
+/**
+ * Every path the router can serve, read out of the router itself.
+ *
+ * This used to be a hand written array with a comment claiming it was kept in sync. It was not:
+ * fourteen account routes had been added without it, and the suite stayed green because the only
+ * thing it checked was the primary nav, which does not point at any of them. Deriving the list
+ * removes the possibility rather than the symptom.
+ */
+function collectPaths(routes: readonly RouteNode[], base = ''): string[] {
+  const found: string[] = []
+  for (const route of routes) {
+    const raw = route.path
+    const full =
+      raw === undefined
+        ? base
+        : raw.startsWith('/')
+          ? raw
+          : `${base === '/' ? '' : base}/${raw}`
+
+    if (raw !== undefined) found.push(full)
+    if (route.children !== undefined) found.push(...collectPaths(route.children, full))
+  }
+  return found
+}
+
 const ROUTE_PATTERNS = [
-  '/login',
-  '/signup',
-  '/forgot-password',
-  // Built screens. Each one leaves STUB_ROUTES as its step lands, so it moves up here.
-  '/',
-  '/inbox/:inboxId',
-  '/inbox/:inboxId/new',
-  '/ai/auto-assign',
-  '/ai/auto-tag',
-  '/ai/auto-tag/review',
-  '/ai/evaluation',
-  '/inbox/:inboxId/:folder',
-  '/inbox/:inboxId/:folder/:conversationId',
-  '/customers',
-  '/customers/:contactId',
-  '/docs',
-  '/docs/:collectionId',
-  '/docs/:collectionId/article/:articleId',
-  '/search',
-  '/inbox/:inboxId/settings/workflows',
-  '/inbox/:inboxId/settings/workflows/new',
-  '/inbox/:inboxId/settings/slas',
-  '/inbox/:inboxId/settings/routing',
-  '/inbox/:inboxId/settings/channels',
-  '/ai/agent',
-  '/reports/all-channels',
-  '/reports/email',
-  '/reports/happiness',
-  '/reports/company',
-  '/reports/ai',
-  '/reports/satisfaction',
-  '/inbox/:inboxId/settings/general',
-  '/inbox/:inboxId/settings/permissions',
-  '/inbox/:inboxId/settings/outgoing-email',
-  '/inbox/:inboxId/settings/auto-reply',
-  '/inbox/:inboxId/settings/inbox-hours',
-  '/inbox/:inboxId/settings/saved-replies',
-  '/inbox/:inboxId/settings/custom-fields',
-  '/inbox/:inboxId/settings/satisfaction-ratings',
-  '/inbox/:inboxId/view/:viewId',
-  '/manage/users',
-  '/manage/teams',
-  '/manage/tags',
-  '/manage/integrations',
-  '/manage/notifications',
-  '/messages',
-  '/ai',
-  '/ai/auto-draft',
-  '/ai/satisfaction',
-  '/ai/agent/setup',
-  '/dev/tokens',
-  '/dev/data',
+  ...collectPaths(router.routes),
   ...STUB_ROUTES.map((route) => route.path),
 ]
 
 function resolves(to: string): boolean {
   return ROUTE_PATTERNS.some((pattern) => matchPath(pattern, to) !== null)
+}
+
+/** Every destination in a settings style rail, flattened. */
+function railTargets(groups: { items: { to: string }[] }[]): string[] {
+  return groups.flatMap((group) => group.items.map((item) => item.to))
 }
 
 describe('no dead ends', () => {
@@ -75,6 +60,24 @@ describe('no dead ends', () => {
       .filter((to) => !resolves(to))
 
     expect(unreachable).toEqual([])
+  })
+
+  it('resolves every destination in the account rail', () => {
+    // The rail this test did not know about until it had fourteen entries in it.
+    const unreachable = railTargets(ACCOUNT_NAV_GROUPS).filter((to) => !resolves(to))
+    expect(unreachable).toEqual([])
+  })
+
+  it('resolves every destination in the inbox settings rail', () => {
+    const unreachable = railTargets(inboxSettingsNav('in1')).filter((to) => !resolves(to))
+    expect(unreachable).toEqual([])
+  })
+
+  it('resolves everywhere the user menu goes', () => {
+    // Literal navigate() calls in UserMenu, which belong to no nav array.
+    for (const target of ['/account/profile', '/manage/notifications']) {
+      expect(resolves(target), `${target} does not resolve`).toBe(true)
+    }
   })
 
   it('resolves the destinations the shell navigates to by keyboard', () => {
@@ -98,9 +101,15 @@ describe('no dead ends', () => {
     expect(resolves('/inbox/in1/unassigned/c1')).toBe(true)
   })
 
+  it('resolves the two places a settings rail sends you out to', () => {
+    // "Back to inboxes" and the AI settings link in the footer.
+    expect(resolves('/')).toBe(true)
+    expect(resolves('/ai')).toBe(true)
+  })
+
   it('registers every path exactly once', () => {
-    const paths = STUB_ROUTES.map((route) => route.path)
-    expect(new Set(paths).size).toBe(paths.length)
+    const paths = ROUTE_PATTERNS.filter((path) => path !== '' && path !== '*')
+    expect(new Set(paths).size, 'a duplicate path shadows whichever came second').toBe(paths.length)
   })
 
   it('gives every registered route a title and a build step', () => {
@@ -112,9 +121,17 @@ describe('no dead ends', () => {
   })
 
   it('covers every screen area the design specification lists', () => {
-    // A coarse guard against dropping a whole area while refactoring the route table. Built and
-    // stubbed routes both count: the point is that no area vanishes, not how far along it is.
-    const areas = ['/inbox', '/ai', '/docs', '/reports', '/customers', '/manage', '/search']
+    // A coarse guard against dropping a whole area while refactoring the route table.
+    const areas = [
+      '/inbox',
+      '/ai',
+      '/docs',
+      '/reports',
+      '/customers',
+      '/manage',
+      '/account',
+      '/search',
+    ]
     for (const area of areas) {
       expect(
         ROUTE_PATTERNS.some((pattern) => pattern.startsWith(area)),

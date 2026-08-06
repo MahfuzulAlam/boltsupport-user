@@ -9,7 +9,9 @@ import type { z } from 'zod'
  * call these helpers and pass their schema; nothing else calls fetch.
  *
  * NFR-2.10 forbids logging message bodies, tokens, or PII, so failures carry a status and a
- * short reason and never the response body.
+ * short reason, never a successful response body, and never the values that failed validation.
+ * The one thing read from a failed response is its `message` field, which the server authors for
+ * display; nothing else in an error envelope is touched.
  */
 
 export type ApiErrorKind = 'network' | 'http' | 'schema'
@@ -19,17 +21,25 @@ export class ApiError extends Error {
   readonly status: number | undefined
   /** Field paths that failed validation. Safe to show; carries no values. */
   readonly issues: string[] | undefined
+  /** What the server said, when it said anything. Present only on `http` errors. */
+  readonly serverMessage: string | undefined
 
   constructor(
     kind: ApiErrorKind,
     message: string,
-    options: { status?: number; issues?: string[]; cause?: unknown } = {},
+    options: {
+      status?: number
+      issues?: string[]
+      serverMessage?: string
+      cause?: unknown
+    } = {},
   ) {
     super(message, { cause: options.cause })
     this.name = 'ApiError'
     this.kind = kind
     this.status = options.status
     this.issues = options.issues
+    this.serverMessage = options.serverMessage
   }
 
   /** What an error boundary or inline retry should show. States what happened and what to do. */
@@ -38,6 +48,9 @@ export class ApiError extends Error {
       case 'network':
         return 'We could not reach the server. Check your connection and try again.'
       case 'http':
+        // The server's explanation beats a generic apology whenever there is one, because it is
+        // the only version that tells somebody what to change.
+        if (this.serverMessage !== undefined) return this.serverMessage
         return this.status === 404
           ? 'That is no longer here. It may have been deleted or moved.'
           : 'The request failed. Try again in a moment.'
@@ -53,15 +66,21 @@ interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'
   body?: unknown
   signal?: AbortSignal
-  searchParams?: Record<string, string | number | undefined>
+  searchParams?: Record<string, string | number | readonly string[] | undefined>
 }
 
 function buildUrl(path: string, searchParams: RequestOptions['searchParams']): string {
   const url = new URL(`${BASE_URL}${path}`, window.location.origin)
   for (const [key, value] of Object.entries(searchParams ?? {})) {
-    if (value !== undefined) {
-      url.searchParams.set(key, String(value))
+    if (value === undefined) continue
+    // Narrowed off the union rather than with Array.isArray, which widens the element to `any`.
+    if (typeof value !== 'string' && typeof value !== 'number') {
+      // Repeated rather than comma joined, so a value containing a comma survives the round trip
+      // and an empty selection drops out of the URL entirely.
+      for (const item of value) url.searchParams.append(key, item)
+      continue
     }
+    url.searchParams.set(key, String(value))
   }
   return url.toString()
 }
@@ -101,9 +120,30 @@ export async function apiRequest<TSchema extends z.ZodTypeAny>(
   }
 
   if (!response.ok) {
-    throw new ApiError('http', `Request to ${path} returned ${String(response.status)}`, {
-      status: response.status,
-    })
+    /*
+     * The server's own words, when it has any.
+     *
+     * A 409 on an invite means "that address is already here", and until this read the body was
+     * discarded and every failure became "returned 409". The one thing a person needs in order to
+     * fix the request was the thing being thrown away. Parsed defensively, since an error response
+     * is exactly where a body is most likely to be missing or not JSON at all.
+     */
+    let detail: string | undefined
+    try {
+      const body: unknown = await response.json()
+      if (typeof body === 'object' && body !== null && 'message' in body) {
+        const { message } = body
+        if (typeof message === 'string' && message.trim() !== '') detail = message
+      }
+    } catch {
+      detail = undefined
+    }
+
+    throw new ApiError(
+      'http',
+      detail ?? `Request to ${path} returned ${String(response.status)}`,
+      { status: response.status, ...(detail === undefined ? {} : { serverMessage: detail }) },
+    )
   }
 
   let payload: unknown

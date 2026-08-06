@@ -2,10 +2,17 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import { initTheme } from '@/hooks/use-theme'
+import { initAccent } from '@/lib/theme'
 import { App } from './App'
 
-// Resolve the theme before the first paint so the page never flashes the wrong one.
+/*
+ * Resolve the theme before the first paint so the page never flashes the wrong one.
+ *
+ * Mode first, then accent: each accent has a light and a dark value, so it can only be resolved
+ * once the document knows which one it is in.
+ */
 initTheme()
+initAccent()
 
 const container = document.getElementById('root')
 if (!container) {

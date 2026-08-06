@@ -4,11 +4,19 @@ import {
   agentStatusSchema,
   aiSettingsSchema,
   articleSchema,
+  aiFeatureSchema,
   convStatusSchema,
+  customFieldSchema,
+  knowledgeKindSchema,
+  provenAnswerSchema,
+  qaEntrySchema,
+  roleSchema,
   folderSchema,
   prioritySchema,
   slaPolicySchema,
   workflowSchema,
+  type ConvStatus,
+  type Priority,
 } from '@/types'
 import { buildSummaryChunks, summaryStream } from './ai-stream'
 import { draftBody, draftMeta, draftStream, evaluateDraft } from './ai-draft'
@@ -63,6 +71,21 @@ import {
   type InboxDocKey,
   type SortKey,
 } from './db'
+
+/**
+ * Text a person typed, made safe to store as HTML.
+ *
+ * Saved replies are authored in a plain field and rendered by the composer, so whatever is typed
+ * here ends up on the page. Escaping at the point of storage means the value is inert before it
+ * is ever handed to a renderer, rather than depending on every future reader to remember.
+ */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
 
 /**
  * Mock API.
@@ -194,6 +217,12 @@ export const handlers = [
     const folder = folderSchema.safeParse(folderParam)
     const limitParam = url.searchParams.get('limit')
 
+    /*
+     * A filter axis with nothing chosen is absent from the URL, not an empty list, so `getAll`
+     * returning `[]` and the caller meaning "no filter" are the same thing by construction.
+     */
+    const chosen = (key: string) => url.searchParams.getAll(key)
+
     return HttpResponse.json(
       queryConversations({
         ...(url.searchParams.get('inboxId') !== null
@@ -211,6 +240,14 @@ export const handlers = [
           ? { cursor: url.searchParams.get('cursor') as string }
           : {}),
         ...(limitParam !== null ? { limit: Number.parseInt(limitParam, 10) } : {}),
+        status: chosen('status').filter(
+          (value): value is ConvStatus => convStatusSchema.safeParse(value).success,
+        ),
+        priority: chosen('priority').filter(
+          (value): value is Priority => prioritySchema.safeParse(value).success,
+        ),
+        assigneeId: chosen('assigneeId'),
+        tagId: chosen('tagId'),
       }),
     )
   }),
@@ -420,6 +457,7 @@ export const handlers = [
       updatedAt: new Date().toISOString(),
       keywords: [],
       relatedIds: [],
+      tagIds: [],
       seo: { titleTag: '', metaDescription: '' },
     })
     return HttpResponse.json(created, { status: 201 })
@@ -468,6 +506,335 @@ export const handlers = [
   http.get('/api/custom-fields', async () => {
     await pause()
     return HttpResponse.json(getDb().customFields)
+  }),
+
+  /*
+   * The create endpoints behind the settings pages.
+   *
+   * Each mirrors the shape its list already serves and pushes onto the same store, so a newly
+   * created row is indistinguishable from a seeded one the moment the list refetches. Ids are
+   * derived from the current length rather than random, which keeps runs reproducible.
+   */
+  /*
+   * The workspace knowledge layer.
+   *
+   * One collection, read by every AI feature. Scoping lives on the source (`usedBy`) rather than
+   * in each feature's settings, so a source can never be read by a feature nobody granted it to.
+   */
+  /*
+   * Risk detection.
+   *
+   * Account signals are read only from the client: they are computed by the detector, not authored
+   * by anybody here. The two that carry a workflow (a churn alert somebody acknowledges, a refund
+   * threat somebody escalates) accept a state change and nothing else, so a client can never edit
+   * the finding itself into agreeing with what it did about it.
+   */
+  http.get('/api/risk/health/:contactId', async ({ params }) => {
+    await pause()
+    const record = getDb().accountHealth.find((item) => item.contactId === String(params['contactId']))
+    return record === undefined ? new HttpResponse(null, { status: 404 }) : HttpResponse.json(record)
+  }),
+
+  http.get('/api/risk/sentiment/:contactId', async ({ params }) => {
+    await pause()
+    const record = getDb().sentimentDrift.find(
+      (item) => item.contactId === String(params['contactId']),
+    )
+    return record === undefined ? new HttpResponse(null, { status: 404 }) : HttpResponse.json(record)
+  }),
+
+  http.get('/api/risk/churn', async ({ request }) => {
+    await pause()
+    const contactId = new URL(request.url).searchParams.get('contactId')
+    const all = getDb().churnAlerts
+    return HttpResponse.json(
+      contactId === null ? all : all.filter((alert) => alert.contactId === contactId),
+    )
+  }),
+
+  http.patch('/api/risk/churn/:id', async ({ params, request }) => {
+    await pause()
+    const body = z
+      .object({ state: z.enum(['open', 'acknowledged', 'dismissed']) })
+      .safeParse(await request.json())
+    if (!body.success) return HttpResponse.json({ message: 'Invalid state' }, { status: 400 })
+
+    const db = getDb()
+    const index = db.churnAlerts.findIndex((alert) => alert.id === String(params['id']))
+    const existing = db.churnAlerts[index]
+    if (existing === undefined) return new HttpResponse(null, { status: 404 })
+
+    const updated = { ...existing, state: body.data.state }
+    db.churnAlerts[index] = updated
+    return HttpResponse.json(updated)
+  }),
+
+  http.get('/api/risk/refund-threat/:conversationId', async ({ params }) => {
+    await pause()
+    const record = getDb().refundThreats.find(
+      (threat) => threat.conversationId === String(params['conversationId']),
+    )
+    return record === undefined ? new HttpResponse(null, { status: 404 }) : HttpResponse.json(record)
+  }),
+
+  http.patch('/api/risk/refund-threat/:id', async ({ params, request }) => {
+    await pause()
+    const body = z
+      .object({ state: z.enum(['open', 'escalated', 'dismissed']) })
+      .safeParse(await request.json())
+    if (!body.success) return HttpResponse.json({ message: 'Invalid state' }, { status: 400 })
+
+    const db = getDb()
+    const index = db.refundThreats.findIndex((threat) => threat.id === String(params['id']))
+    const existing = db.refundThreats[index]
+    if (existing === undefined) return new HttpResponse(null, { status: 404 })
+
+    const updated = { ...existing, state: body.data.state }
+    db.refundThreats[index] = updated
+    return HttpResponse.json(updated)
+  }),
+
+  http.get('/api/ai/knowledge', async () => {
+    await pause()
+    return HttpResponse.json(getDb().knowledgeBases)
+  }),
+
+  http.post('/api/ai/knowledge', async ({ request }) => {
+    await pause()
+    const body = z
+      .object({
+        kind: knowledgeKindSchema,
+        label: z.string().min(1),
+        description: z.string().optional(),
+        url: z.string().optional(),
+      })
+      .safeParse(await request.json())
+    if (!body.success) return HttpResponse.json({ message: 'Invalid source' }, { status: 400 })
+
+    const db = getDb()
+    if (db.knowledgeBases.some((source) => source.kind === body.data.kind)) {
+      // One of each kind. Two "Documentation" sources would be two answers to the same question
+      // about what the AI reads, which is the confusion this layer exists to remove.
+      return HttpResponse.json(
+        { message: 'That kind of source already exists. Open it to add to it.' },
+        { status: 409 },
+      )
+    }
+
+    const source = {
+      id: `kb${String(db.knowledgeBases.length + 1)}`,
+      kind: body.data.kind,
+      label: body.data.label,
+      description: body.data.description ?? '',
+      // A website has to be fetched before it knows anything; the rest are ready to fill in.
+      status: body.data.kind === 'website' ? ('indexing' as const) : ('draft' as const),
+      itemCount: 0,
+      usedBy: [],
+      injectionDetected: false,
+      ...(body.data.url === undefined ? {} : { url: body.data.url }),
+      ...(body.data.kind === 'qa' ? { entries: [] } : {}),
+      ...(body.data.kind === 'proven' ? { answers: [] } : {}),
+      ...(body.data.kind === 'documentation' ? { collectionIds: [] } : {}),
+    }
+    db.knowledgeBases.push(source)
+    return HttpResponse.json(source, { status: 201 })
+  }),
+
+  http.patch('/api/ai/knowledge/:id', async ({ params, request }) => {
+    await pause()
+    const body = z
+      .object({
+        label: z.string().min(1).optional(),
+        description: z.string().optional(),
+        usedBy: z.array(aiFeatureSchema).optional(),
+        entries: z.array(qaEntrySchema).optional(),
+        answers: z.array(provenAnswerSchema).optional(),
+        collectionIds: z.array(z.string()).optional(),
+      })
+      .safeParse(await request.json())
+    if (!body.success) return HttpResponse.json({ message: 'Invalid patch' }, { status: 400 })
+
+    const db = getDb()
+    const index = db.knowledgeBases.findIndex((source) => source.id === String(params['id']))
+    const existing = db.knowledgeBases[index]
+    if (existing === undefined) return new HttpResponse(null, { status: 404 })
+
+    const updated = { ...existing, ...body.data }
+
+    /*
+     * The count is derived, never sent.
+     *
+     * A client that reported its own item count could disagree with the list it just wrote, and
+     * the number on the card is the thing people trust to tell them whether a source is empty.
+     */
+    updated.itemCount =
+      updated.kind === 'qa'
+        ? (updated.entries?.length ?? 0)
+        : updated.kind === 'proven'
+          ? (updated.answers?.filter((answer) => answer.state === 'approved').length ?? 0)
+          : updated.itemCount
+
+    if (updated.status === 'draft' && updated.itemCount > 0) updated.status = 'ready'
+
+    db.knowledgeBases[index] = updated
+    return HttpResponse.json(updated)
+  }),
+
+  http.delete('/api/ai/knowledge/:id', async ({ params }) => {
+    await pause()
+    const db = getDb()
+    const index = db.knowledgeBases.findIndex((source) => source.id === String(params['id']))
+    if (index === -1) return new HttpResponse(null, { status: 404 })
+    db.knowledgeBases.splice(index, 1)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  /**
+   * Turn resolved conversations into draft answers.
+   *
+   * Drafts, never approved: the reply that resolved one conversation was written for one
+   * customer and may carry an account number or a one off concession. The approval step is where
+   * somebody notices before it is repeated to everybody.
+   */
+  http.post('/api/ai/knowledge/:id/harvest', async ({ params, request }) => {
+    await pause()
+    const body = z
+      .object({ conversationIds: z.array(z.string()).min(1) })
+      .safeParse(await request.json())
+    if (!body.success) return HttpResponse.json({ message: 'Pick at least one' }, { status: 400 })
+
+    const db = getDb()
+    const index = db.knowledgeBases.findIndex((source) => source.id === String(params['id']))
+    const existing = db.knowledgeBases[index]
+    if (existing === undefined) return new HttpResponse(null, { status: 404 })
+
+    const answers = [...(existing.answers ?? [])]
+    for (const conversationId of body.data.conversationIds) {
+      if (answers.some((answer) => answer.conversationId === conversationId)) continue
+      const conversation = findConversation(conversationId)
+      if (conversation === undefined) continue
+
+      answers.push({
+        id: `pa${String(answers.length + 1)}`,
+        conversationId,
+        conversationSubject: conversation.subject,
+        question: conversation.subject,
+        answer: conversation.preview,
+        state: 'draft',
+        similarCount: 0,
+      })
+    }
+
+    const updated = { ...existing, answers }
+    db.knowledgeBases[index] = updated
+    return HttpResponse.json(updated)
+  }),
+
+  http.patch('/api/integrations/:id', async ({ params, request }) => {
+    await pause()
+    const body = z.object({ connected: z.boolean() }).safeParse(await request.json())
+    if (!body.success) return HttpResponse.json({ message: 'Invalid patch' }, { status: 400 })
+
+    const db = getDb()
+    const index = db.integrations.findIndex((item) => item.id === String(params['id']))
+    const existing = db.integrations[index]
+    if (existing === undefined) return new HttpResponse(null, { status: 404 })
+
+    const updated = { ...existing, connected: body.data.connected }
+    db.integrations[index] = updated
+    return HttpResponse.json(updated)
+  }),
+
+  http.post('/api/users', async ({ request }) => {
+    await pause()
+    const body = z
+      .object({ name: z.string().min(1), email: z.email(), role: roleSchema })
+      .safeParse(await request.json())
+    if (!body.success) return HttpResponse.json({ message: 'Invalid user' }, { status: 400 })
+
+    const db = getDb()
+    if (db.users.some((user) => user.email === body.data.email)) {
+      return HttpResponse.json({ message: 'That address is already invited' }, { status: 409 })
+    }
+
+    const user = {
+      ...body.data,
+      id: `u${String(db.users.length + 1)}`,
+      available: true,
+      openCount: 0,
+      skills: [],
+    }
+    db.users.push(user)
+    return HttpResponse.json(user, { status: 201 })
+  }),
+
+  http.post('/api/tags', async ({ request }) => {
+    await pause()
+    const body = z
+      .object({ name: z.string().min(1), color: z.string().regex(/^#[0-9a-fA-F]{6}$/) })
+      .safeParse(await request.json())
+    if (!body.success) return HttpResponse.json({ message: 'Invalid tag' }, { status: 400 })
+
+    const db = getDb()
+    const tag = { ...body.data, id: `t${String(db.tags.length + 1)}` }
+    db.tags.push(tag)
+    return HttpResponse.json(tag, { status: 201 })
+  }),
+
+  http.post('/api/teams', async ({ request }) => {
+    await pause()
+    const body = z.object({ name: z.string().min(1) }).safeParse(await request.json())
+    if (!body.success) return HttpResponse.json({ message: 'Invalid team' }, { status: 400 })
+
+    const db = getDb()
+    const team = { ...body.data, id: `tm${String(db.teams.length + 1)}`, memberIds: [] }
+    db.teams.push(team)
+    return HttpResponse.json(team, { status: 201 })
+  }),
+
+  http.post('/api/custom-fields', async ({ request }) => {
+    await pause()
+    const body = z
+      .object({
+        label: z.string().min(1),
+        type: customFieldSchema.shape.type,
+        appliesTo: customFieldSchema.shape.appliesTo,
+      })
+      .safeParse(await request.json())
+    if (!body.success) return HttpResponse.json({ message: 'Invalid field' }, { status: 400 })
+
+    const db = getDb()
+    const field = {
+      ...body.data,
+      id: `cf${String(db.customFields.length + 1)}`,
+      options: [],
+      required: false,
+    }
+    db.customFields.push(field)
+    return HttpResponse.json(field, { status: 201 })
+  }),
+
+  http.post('/api/saved-replies', async ({ request }) => {
+    await pause()
+    const body = z
+      .object({ name: z.string().min(1), body: z.string() })
+      .safeParse(await request.json())
+    if (!body.success) return HttpResponse.json({ message: 'Invalid reply' }, { status: 400 })
+
+    const db = getDb()
+    const reply = {
+      id: `sr${String(db.savedReplies.length + 1)}`,
+      name: body.data.name,
+      // Plain text in, paragraphs out. The composer renders this, so it never reaches a customer
+      // as markup somebody typed into a settings field.
+      bodyHtml: body.data.body
+        .split(/\n{2,}/)
+        .map((para) => `<p>${escapeHtml(para)}</p>`)
+        .join(''),
+      usageCount: 0,
+    }
+    db.savedReplies.push(reply)
+    return HttpResponse.json(reply, { status: 201 })
   }),
 
   http.get('/api/teams', async () => {

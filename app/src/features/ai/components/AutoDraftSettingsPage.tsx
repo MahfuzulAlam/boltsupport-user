@@ -8,6 +8,8 @@ import {
   Toggle,
 } from '@/components/settings-primitives'
 import { useAiSettingsForm } from '../hooks/use-ai-settings-form'
+import { InstructionsField } from './InstructionsField'
+import { KnowledgeUsage } from './KnowledgeUsage'
 
 const TONES = [
   { value: 'friendly', label: 'Friendly' },
@@ -101,6 +103,66 @@ export function AutoDraftSettingsPage() {
             Every reply leaves because a person pressed Send.
           </GuardrailWarning>
         </SettingsSection>
+
+        <SettingsSection
+          title="Shape"
+          description="Defaults for a new draft. An agent can override any of them per reply."
+        >
+          <label htmlFor="draft-length" className="text-[14px] font-medium">
+            Length
+          </label>
+          <div className="mt-2 mb-4">
+            <Select
+              value={autoDraft.defaultLength}
+              onChange={(next) => {
+                patch({ defaultLength: next as typeof autoDraft.defaultLength })
+              }}
+              options={[
+                { value: 'short', label: 'Short — two or three sentences' },
+                { value: 'standard', label: 'Standard — a normal reply' },
+                { value: 'detailed', label: 'Detailed — steps and context' },
+              ]}
+              aria-label="Length"
+            />
+          </div>
+
+          <Toggle
+            checked={autoDraft.requireCitations}
+            onChange={(requireCitations) => {
+              patch({ requireCitations })
+            }}
+            label="Say when nothing backed the draft"
+            description="A draft with no matching source states so, rather than sounding equally sure (FR-4.15)."
+          />
+
+          <div className="mt-4">
+            <Toggle
+              checked={autoDraft.matchCustomerLanguage}
+              onChange={(matchCustomerLanguage) => {
+                patch({ matchCustomerLanguage })
+              }}
+              label="Reply in the customer's language"
+              description="Detected from what they wrote. Off, every draft comes back in English."
+            />
+          </div>
+        </SettingsSection>
+
+        <InstructionsField
+          title="Drafting instructions"
+          description="Guidance for drafts only. Tone is set above; this is about substance and habits."
+          examples={[
+            'Open with the answer, then the reasoning.',
+            'Do not apologise more than once in a reply.',
+            'Never commit to a date for anything unreleased.',
+          ]}
+          value={autoDraft.instructions}
+          onChange={(instructions) => {
+            patch({ instructions })
+          }}
+          workspace={settings.workspaceInstructions}
+        />
+
+        <KnowledgeUsage feature="autoDraft" />
       </div>
 
       <StickySaveBar dirty={form.dirty} note="" onDiscard={form.discard} onSave={form.save} />

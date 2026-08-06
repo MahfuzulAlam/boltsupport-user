@@ -4,10 +4,13 @@ import {
   GuardrailWarning,
   SettingsSection,
   StickySaveBar,
+  ThresholdSlider,
   Toggle,
 } from '@/components/settings-primitives'
 import { cn } from '@/lib/utils'
 import { useAiSettingsForm } from '../hooks/use-ai-settings-form'
+import { InstructionsField } from './InstructionsField'
+import { KnowledgeUsage } from './KnowledgeUsage'
 
 const AUDIENCES = [
   {
@@ -91,6 +94,32 @@ export function SatisfactionSettingsPage() {
           </div>
         </SettingsSection>
 
+        <SettingsSection
+          title="What counts as at risk"
+          description="Under this, the conversation joins the At risk view while there is still time to rescue it."
+        >
+          <ThresholdSlider
+            value={satisfaction.atRiskThreshold}
+            onChange={(atRiskThreshold) => {
+              patch({ atRiskThreshold })
+            }}
+            helper={(percent) =>
+              `A predicted score under ${String(percent)}% puts the conversation in the At risk view.`
+            }
+          />
+
+          <div className="mt-4">
+            <Toggle
+              checked={satisfaction.showOnContactProfile}
+              onChange={(showOnContactProfile) => {
+                patch({ showOnContactProfile })
+              }}
+              label="Show the prediction on the customer profile"
+              description="A prediction is a guess about a person. Off keeps it out of their record entirely."
+            />
+          </div>
+        </SettingsSection>
+
         <SettingsSection title="Where it never appears">
           {/* FR-4.42 and FR-4.44 stated where someone configuring the feature will read them. */}
           <GuardrailWarning>
@@ -107,6 +136,23 @@ export function SatisfactionSettingsPage() {
             , with a confusion grid so the accuracy figure can be checked rather than trusted.
           </p>
         </SettingsSection>
+
+        <InstructionsField
+          title="What to watch for"
+          description="Guidance for prediction only. It changes what counts as a warning sign, not what is shown."
+          examples={[
+            'Treat a second unanswered follow up as a stronger signal than harsh wording.',
+            'A long thread that is moving forward is not at risk.',
+            'Ignore tone in languages other than the one the customer opened in.',
+          ]}
+          value={satisfaction.instructions}
+          onChange={(instructions) => {
+            patch({ instructions })
+          }}
+          workspace={settings.workspaceInstructions}
+        />
+
+        <KnowledgeUsage feature="satisfaction" />
       </div>
 
       <StickySaveBar dirty={form.dirty} note="" onDiscard={form.discard} onSave={form.save} />

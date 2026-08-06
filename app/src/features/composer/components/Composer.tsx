@@ -33,7 +33,7 @@ import {
 import { useSendMessage } from '../hooks/use-send-message'
 import { MERGE_FIELDS } from '../merge-field'
 import { RecipientFields } from './RecipientFields'
-import { WhenDialog, type WhenChoice } from './WhenDialog'
+import { WhenDialog, type WhenChoice } from '@/components/WhenDialog'
 import { TiptapEditor } from './TiptapEditor'
 import { SlashCommandMenu, type SlashAction } from './SlashCommandMenu'
 import { InsertPicker, type InsertSource } from './InsertPicker'

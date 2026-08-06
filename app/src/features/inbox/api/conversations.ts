@@ -27,6 +27,11 @@ export interface ConversationListParams {
   search?: string
   cursor?: string
   limit?: number
+  /** The toolbar filter, as repeated query parameters so an empty axis is simply absent. */
+  status?: ConvStatus[]
+  priority?: Priority[]
+  assigneeId?: string[]
+  tagId?: string[]
 }
 
 export function fetchConversations(
@@ -42,6 +47,10 @@ export function fetchConversations(
       q: params.search,
       cursor: params.cursor,
       limit: params.limit,
+      status: params.status,
+      priority: params.priority,
+      assigneeId: params.assigneeId,
+      tagId: params.tagId,
     },
   })
 }

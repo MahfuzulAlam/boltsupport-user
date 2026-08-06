@@ -16,15 +16,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { WhenDialog, type WhenChoice } from '@/components/WhenDialog'
 import { SlaBadge } from '@/features/automation'
 import { shortcutDisplay } from '@/lib/shortcuts'
-import type { Conversation, ConvStatus, Priority, Tag } from '@/types'
+import { snoozePresets } from '@/lib/when'
+import type { Conversation, ConvStatus, Priority, Tag, User } from '@/types'
 
 interface ConversationHeaderProps {
   conversation: Conversation
   backTo: string
   /** The workspace tag set, for the add menu. */
   allTags: Tag[]
+  /** Everyone the conversation can be handed to. */
+  users: User[]
+  onAssign: (userId: string | null) => void
+  onSnooze: (choice: WhenChoice) => void
   /** The conversation level actions menu, rendered at the end of the control row. */
   actions?: React.ReactNode
   onEdit: (edit: {
@@ -64,10 +70,18 @@ export function ConversationHeader({
   conversation,
   backTo,
   allTags,
+  users,
   actions,
   onEdit,
+  onAssign,
+  onSnooze,
 }: ConversationHeaderProps) {
   const [subject, setSubject] = useState(conversation.subject)
+  const [snoozing, setSnoozing] = useState(false)
+
+  // Presets are relative to when the dialog opened, not to render, so "tomorrow morning" does not
+  // drift while the dialog sits there.
+  const [snoozeOpenedAt, setSnoozeOpenedAt] = useState(() => new Date())
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Keep the field in step when the conversation changes underneath, but never while the agent
@@ -187,20 +201,73 @@ export function ConversationHeader({
         </DropdownMenu>
 
         <div className="flex shrink-0 items-center gap-0.5">
-          {[
-            { icon: UserRound, label: 'Assign', shortcut: 'assign' as const },
-            { icon: Clock, label: 'Snooze', shortcut: 'snooze' as const },
-          ].map(({ icon: Icon, label, shortcut }) => (
-            <button
-              key={label}
-              type="button"
-              aria-label={label}
-              title={`${label} (${shortcutDisplay(shortcut)})`}
-              className="flex size-8 items-center justify-center rounded-md hover:bg-[color:var(--hover)]"
-            >
-              <Icon className="size-4" style={{ color: 'var(--muted-foreground)' }} />
-            </button>
-          ))}
+          {/*
+           * Assign and Snooze, which used to be two icons that did nothing.
+           *
+           * They sat here with tooltips advertising their keyboard chords, so the only way to
+           * find out they were inert was to click one. Both now open the same controls the
+           * composer footer uses, since a conversation is snoozed the same way wherever you
+           * reach for it.
+           */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label="Assign"
+                title={`Assign (${shortcutDisplay('assign')})`}
+                className="flex size-8 items-center justify-center rounded-md hover:bg-[color:var(--hover)]"
+              >
+                <UserRound className="size-4" style={{ color: 'var(--muted-foreground)' }} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[200px]">
+              <DropdownMenuItem
+                onSelect={() => {
+                  onAssign(null)
+                }}
+              >
+                Unassigned
+              </DropdownMenuItem>
+              {users.map((user) => (
+                <DropdownMenuItem
+                  key={user.id}
+                  onSelect={() => {
+                    onAssign(user.id)
+                  }}
+                >
+                  {user.name}
+                  {user.id === conversation.assigneeId ? (
+                    <span className="ml-auto text-[12px]" style={{ color: 'var(--brand)' }}>
+                      Current
+                    </span>
+                  ) : null}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <button
+            type="button"
+            aria-label="Snooze"
+            title={`Snooze (${shortcutDisplay('snooze')})`}
+            onClick={() => {
+              setSnoozeOpenedAt(new Date())
+              setSnoozing(true)
+            }}
+            className="flex size-8 items-center justify-center rounded-md hover:bg-[color:var(--hover)]"
+          >
+            <Clock className="size-4" style={{ color: 'var(--muted-foreground)' }} />
+          </button>
+
+          <WhenDialog
+            title="Snooze until"
+            description="The conversation leaves the queue and comes back at the time you pick."
+            presets={snoozePresets(snoozeOpenedAt)}
+            open={snoozing}
+            onOpenChange={setSnoozing}
+            now={snoozeOpenedAt}
+            onChoose={onSnooze}
+          />
 
           {/* Last in the row, past the single purpose icons: everything in here changes the
               conversation as a whole rather than one property of it. */}

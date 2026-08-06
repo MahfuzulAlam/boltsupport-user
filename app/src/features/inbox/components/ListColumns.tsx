@@ -24,7 +24,7 @@ export function ListColumns({ allSelected, onToggleAll }: ListColumnsProps) {
       />
       <span className="w-[172px] shrink-0">Customer</span>
       <span className="min-w-0 flex-1">Conversation</span>
-      <span className="w-[82px] shrink-0 text-right">SLA</span>
+      <span className="w-[92px] shrink-0 text-right">SLA</span>
       <span className="w-5 shrink-0 text-center" title="Predicted satisfaction">
         CSAT
       </span>

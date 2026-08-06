@@ -124,14 +124,11 @@ export function SlaZeroState({ onCreate }: { onCreate: () => void }) {
           ))}
         </ul>
 
-        <div className="flex items-center gap-4">
-          <Button size="lg" onClick={onCreate}>
-            Create SLA policy
-          </Button>
-          <button type="button" className="text-[13px]" style={{ color: 'var(--brand)' }}>
-            Learn more
-          </button>
-        </div>
+        {/* One action. "Learn more" used to sit beside it and go nowhere, and the list of what
+            an SLA gets you is right above, so it was pointing at what the reader had just read. */}
+        <Button size="lg" onClick={onCreate}>
+          Create SLA policy
+        </Button>
       </div>
 
       <Illustration />

@@ -4,7 +4,7 @@ import { Mail, UserRound } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { safeHref, EXTERNAL_LINK_ATTRS } from '@/lib/url'
 import type { Contact, Conversation } from '@/types'
-import { AiSummaryPanel, PredictedSatisfactionPanel } from '@/features/ai'
+import { AccountRiskPanels, AiSummaryPanel, PredictedSatisfactionPanel } from '@/features/ai'
 import { SidebarCard } from './SidebarCard'
 
 interface ConversationSidebarProps {
@@ -59,6 +59,10 @@ export function ConversationSidebar({
       {aiEnabled ? (
         <PredictedSatisfactionPanel prediction={conversation.ai?.predictedSatisfaction} />
       ) : null}
+
+      {/* The account this conversation belongs to, not the conversation. An agent replying to one
+          ticket is the person best placed to notice the account behind it is in trouble. */}
+      <AccountRiskPanels contactId={conversation.contact.id} inboxId={conversation.inboxId} />
 
       <section
         className="mb-3 rounded-lg border p-3.5"

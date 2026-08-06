@@ -160,6 +160,8 @@ export const articles: Article[] = ARTICLE_SEEDS.map((seed) => ({
   updatedAt: minutesBefore(SEED_NOW, seed.minutesAgo),
   keywords: seed.keywords,
   relatedIds: [],
+  // A couple of articles arrive tagged so the panel has something in it on first open.
+  tagIds: seed.id === 'a1' ? ['t4'] : seed.id === 'a2' ? ['t4', 't5'] : [],
   seo: {
     titleTag: `${seed.title} | BoltSupport`,
     metaDescription: seed.body.slice(0, 155),

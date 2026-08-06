@@ -1,4 +1,12 @@
-import type { AiSuggestion, Channel, Conversation, Folder, Message } from '@/types'
+import type {
+  AiSuggestion,
+  Channel,
+  Conversation,
+  ConvStatus,
+  Folder,
+  Message,
+  Priority,
+} from '@/types'
 import { createSeedData, type SeedData } from './seed'
 import { CURRENT_USER_ID } from './seed/workspace'
 
@@ -81,6 +89,15 @@ export interface ConversationQuery {
   search?: string
   cursor?: string
   limit?: number
+  /*
+   * The toolbar filter. Each is a set the conversation must be in, and the sets combine with AND
+   * across axes and OR within one, which is how somebody reads "urgent or high, assigned to me":
+   * narrowing by a second axis should never widen the result.
+   */
+  status?: ConvStatus[]
+  priority?: Priority[]
+  assigneeId?: string[]
+  tagId?: string[]
 }
 
 export interface ConversationPage {
@@ -90,7 +107,19 @@ export interface ConversationPage {
 }
 
 export function queryConversations(query: ConversationQuery): ConversationPage {
-  const { inboxId, contactId, folder, sort = 'waiting', search, cursor, limit = 40 } = query
+  const {
+    inboxId,
+    contactId,
+    folder,
+    sort = 'waiting',
+    search,
+    cursor,
+    limit = 40,
+    status,
+    priority,
+    assigneeId,
+    tagId,
+  } = query
 
   let items = db.conversations
   if (inboxId !== undefined) {
@@ -111,6 +140,21 @@ export function queryConversations(query: ConversationQuery): ConversationPage {
         c.contact.name.toLowerCase().includes(needle) ||
         String(c.number).includes(needle),
     )
+  }
+
+  if (status !== undefined && status.length > 0) {
+    items = items.filter((c) => status.includes(c.status))
+  }
+  if (priority !== undefined && priority.length > 0) {
+    items = items.filter((c) => priority.includes(c.priority))
+  }
+  if (assigneeId !== undefined && assigneeId.length > 0) {
+    // `unassigned` is a real choice rather than the absence of one, so it is spelled out here
+    // instead of being reachable only by clearing the filter.
+    items = items.filter((c) => assigneeId.includes(c.assigneeId ?? 'unassigned'))
+  }
+  if (tagId !== undefined && tagId.length > 0) {
+    items = items.filter((c) => c.tags.some((tag) => tagId.includes(tag.id)))
   }
 
   const sorted = [...items].sort((a, b) => compare(a, b, sort))

@@ -69,3 +69,40 @@ describe('the zod boundary', () => {
     expect((error as Error).name).toBe('AbortError')
   })
 })
+
+describe('what a failure tells you', () => {
+  /*
+   * Every 4xx used to read "returned 409" regardless of what the server said, so the one sentence
+   * that explains how to fix the request was parsed, discarded, and replaced with a status code.
+   */
+  it('prefers the server\'s own explanation', async () => {
+    server.use(
+      http.post('/api/things', () =>
+        HttpResponse.json({ message: 'That address is already invited' }, { status: 409 }),
+      ),
+    )
+
+    const error = await apiRequest('/things', z.unknown(), { method: 'POST', body: {} }).catch(
+      (caught: unknown) => caught,
+    )
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect((error as ApiError).serverMessage).toBe('That address is already invited')
+    expect((error as ApiError).userMessage).toBe('That address is already invited')
+    expect((error as ApiError).status).toBe(409)
+  })
+
+  it('falls back cleanly when the body is not JSON', async () => {
+    server.use(http.post('/api/things', () => new HttpResponse('gateway timeout', { status: 504 })))
+
+    const error = await apiRequest('/things', z.unknown(), { method: 'POST', body: {} }).catch(
+      (caught: unknown) => caught,
+    )
+
+    // No server sentence to show, so the generic line stands rather than leaking a status code
+    // into the interface.
+    expect((error as ApiError).serverMessage).toBeUndefined()
+    expect((error as ApiError).userMessage).toBe('The request failed. Try again in a moment.')
+  })
+})
+

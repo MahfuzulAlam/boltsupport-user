@@ -45,11 +45,18 @@ export function SettingsNav({ header, groups, label, footer }: SettingsNavProps)
           <div key={group.title} className="mb-5">
             <p className="eyebrow mb-1.5 px-2.5">{group.title}</p>
 
+            {/*
+             * The links are deliberately not `end`.
+             *
+             * A rail item stays lit for everything underneath it, because a detail page is still
+             * that section: opening an app from My apps, or starting a workflow from Workflows,
+             * should not leave the rail with nothing selected and no clue where you are. Matching
+             * is per segment, so no item can light up for another.
+             */}
             {group.items.map(({ to, label: itemLabel, icon: Icon, badge }) => (
               <NavLink
                 key={to}
                 to={to}
-                end
                 className={({ isActive }) =>
                   cn(
                     'mb-0.5 flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-[14px]',

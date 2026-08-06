@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { ApiError } from '@/lib/api-client'
 import { EXTERNAL_LINK_ATTRS, safeHref } from '@/lib/url'
-import { SatisfactionDot } from '@/features/ai'
+import { AccountRiskPanels, SatisfactionDot } from '@/features/ai'
 import { fetchContact, fetchContactHistory } from '../api/contacts'
 
 /**
@@ -128,48 +128,54 @@ export function ContactProfilePage() {
           </dl>
         </aside>
 
-        <section>
-          <h2 className="mb-2 text-[16px] font-semibold tracking-[-0.01em]">
-            Conversations{' '}
-            <span className="font-mono text-[14px]" style={{ color: 'var(--muted-foreground)' }}>
-              {threads.length}
-            </span>
-          </h2>
+        <div className="min-w-0">
+          {/* First in the main column. Somebody opening a customer wants to know whether this
+              account is in trouble before they read what it has asked about. */}
+          <AccountRiskPanels contactId={record.id} inboxId={threads[0]?.inboxId} />
 
-          {history.isPending ? (
-            <p className="text-[13px]" style={{ color: 'var(--muted-foreground)' }}>
-              Loading
-            </p>
-          ) : threads.length === 0 ? (
-            <p className="text-[13px]" style={{ color: 'var(--muted-foreground)' }}>
-              This is their first conversation with you.
-            </p>
-          ) : (
-            <div
-              className="overflow-hidden rounded-lg border"
-              style={{ borderColor: 'var(--border)', background: 'var(--card)' }}
-            >
-              {threads.map((thread) => (
-                <Link
-                  key={thread.id}
-                  to={`/inbox/${thread.inboxId}/${thread.status === 'closed' ? 'closed' : 'assigned'}/${thread.id}`}
-                  className="flex items-center gap-3 border-b px-3 py-2.5 text-[13px] last:border-b-0 hover:bg-[color:var(--hover)]"
-                  style={{ borderColor: 'var(--border)' }}
-                >
-                  <span className="min-w-0 flex-1 truncate font-medium">{thread.subject}</span>
-                  <SatisfactionDot prediction={thread.ai?.predictedSatisfaction} />
-                  <span
-                    className="w-[70px] shrink-0 capitalize"
-                    style={{ color: 'var(--muted-foreground)' }}
+          <section>
+            <h2 className="mb-2 text-[16px] font-semibold tracking-[-0.01em]">
+              Conversations{' '}
+              <span className="font-mono text-[14px]" style={{ color: 'var(--muted-foreground)' }}>
+                {threads.length}
+              </span>
+            </h2>
+
+            {history.isPending ? (
+              <p className="text-[13px]" style={{ color: 'var(--muted-foreground)' }}>
+                Loading
+              </p>
+            ) : threads.length === 0 ? (
+              <p className="text-[13px]" style={{ color: 'var(--muted-foreground)' }}>
+                This is their first conversation with you.
+              </p>
+            ) : (
+              <div
+                className="overflow-hidden rounded-lg border"
+                style={{ borderColor: 'var(--border)', background: 'var(--card)' }}
+              >
+                {threads.map((thread) => (
+                  <Link
+                    key={thread.id}
+                    to={`/inbox/${thread.inboxId}/${thread.status === 'closed' ? 'closed' : 'assigned'}/${thread.id}`}
+                    className="flex items-center gap-3 border-b px-3 py-2.5 text-[13px] last:border-b-0 hover:bg-[color:var(--hover)]"
+                    style={{ borderColor: 'var(--border)' }}
                   >
-                    {thread.status}
-                  </span>
-                  <span className="w-[64px] shrink-0 text-right font-mono">#{thread.number}</span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </section>
+                    <span className="min-w-0 flex-1 truncate font-medium">{thread.subject}</span>
+                    <SatisfactionDot prediction={thread.ai?.predictedSatisfaction} />
+                    <span
+                      className="w-[70px] shrink-0 capitalize"
+                      style={{ color: 'var(--muted-foreground)' }}
+                    >
+                      {thread.status}
+                    </span>
+                    <span className="w-[64px] shrink-0 text-right font-mono">#{thread.number}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
       </div>
     </div>
   )

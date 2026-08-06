@@ -14,6 +14,8 @@ import {
   Toggle,
 } from '@/components/settings-primitives'
 import { useAiSettingsForm } from '../hooks/use-ai-settings-form'
+import { InstructionsField } from './InstructionsField'
+import { KnowledgeUsage } from './KnowledgeUsage'
 
 /**
  * Auto Tag settings.
@@ -103,6 +105,35 @@ export function AutoTagSettingsPage() {
         </SettingsSection>
 
         <SettingsSection
+          title="How many"
+          description="A thread that touches six topics should not come back wearing six tags."
+        >
+          <label htmlFor="max-tags" className="text-[14px] font-medium">
+            At most
+          </label>
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              id="max-tags"
+              type="number"
+              min={1}
+              max={10}
+              value={autoTag.maxTagsPerConversation}
+              onChange={(event) => {
+                const parsed = Number.parseInt(event.target.value, 10)
+                if (!Number.isNaN(parsed)) {
+                  patch({ maxTagsPerConversation: Math.min(10, Math.max(1, parsed)) })
+                }
+              }}
+              className="h-9 w-[88px] rounded-md border px-2.5 text-[14px] outline-none"
+              style={{ borderColor: 'var(--input)', background: 'var(--background)' }}
+            />
+            <span className="text-[14px]" style={{ color: 'var(--muted-foreground)' }}>
+              tags per conversation
+            </span>
+          </div>
+        </SettingsSection>
+
+        <SettingsSection
           title="Allowed tag set"
           description="The AI can only choose from this list. It can never invent a new tag."
         >
@@ -160,6 +191,23 @@ export function AutoTagSettingsPage() {
             without review, and each one is logged with Undo.
           </GuardrailWarning>
         ) : null}
+
+        <InstructionsField
+          title="Tagging instructions"
+          description="Guidance for tagging only. This is where the distinctions your tag set implies but cannot state get written down."
+          examples={[
+            'A refund request is billing. A chargeback is chargeback, never billing.',
+            'Tag what the customer wants, not how they feel about it.',
+            'If a thread covers two topics, prefer the one they opened with.',
+          ]}
+          value={autoTag.instructions}
+          onChange={(instructions) => {
+            patch({ instructions })
+          }}
+          workspace={form.settings.workspaceInstructions}
+        />
+
+        <KnowledgeUsage feature="autoTag" />
       </div>
 
       <StickySaveBar

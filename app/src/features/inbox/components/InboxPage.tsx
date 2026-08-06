@@ -7,9 +7,14 @@ import { useMediaQuery, BREAKPOINTS } from '@/hooks/use-media-query'
 import { ApiError } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import { folderSchema, type ConvStatus } from '@/types'
-import { fetchUsers, fetchViews } from '../api/conversations'
+import { fetchTags, fetchUsers, fetchViews } from '../api/conversations'
 import { useInboxes } from '../hooks/use-inboxes'
-import { useConversationList, type ListSort } from '../hooks/use-conversation-list'
+import {
+  EMPTY_FILTER,
+  useConversationList,
+  type ListFilter,
+  type ListSort,
+} from '../hooks/use-conversation-list'
 import { useListSelection } from '../hooks/use-list-selection'
 import { useListDensity } from '../hooks/use-list-density'
 import { useBulkPatch } from '../hooks/use-conversation-mutations'
@@ -29,6 +34,7 @@ export function InboxPage() {
   const folderParam = folderSchema.safeParse(params['folder'])
 
   const [sort, setSort] = useState<ListSort>('waiting')
+  const [filter, setFilter] = useState<ListFilter>(EMPTY_FILTER)
   const [splitView, setSplitView] = useState(false)
   const [cursorIndex, setCursorIndex] = useState(0)
   const { density, rowHeight, toggleDensity } = useListDensity()
@@ -37,9 +43,10 @@ export function InboxPage() {
   const inboxes = useInboxes()
   const views = useQuery({ queryKey: ['views'], queryFn: ({ signal }) => fetchViews(signal) })
   const users = useQuery({ queryKey: ['users'], queryFn: ({ signal }) => fetchUsers(signal) })
+  const tags = useQuery({ queryKey: ['tags'], queryFn: ({ signal }) => fetchTags(signal) })
 
   const folder = folderParam.success ? folderParam.data : 'unassigned'
-  const list = useConversationList({ inboxId, folder, sort })
+  const list = useConversationList({ inboxId, folder, sort, filter })
   const selection = useListSelection(list.conversations.map((c) => c.id))
   const bulkPatch = useBulkPatch()
 
@@ -112,6 +119,10 @@ export function InboxPage() {
           total={list.total}
           sort={sort}
           onSortChange={setSort}
+          filter={filter}
+          onFilterChange={setFilter}
+          users={users.data ?? []}
+          tags={tags.data ?? []}
           density={density}
           onDensityToggle={toggleDensity}
           splitView={splitView}

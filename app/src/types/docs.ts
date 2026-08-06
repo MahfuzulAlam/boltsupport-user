@@ -30,6 +30,9 @@ export const articleSchema = z.object({
   updatedAt: isoDateSchema,
   keywords: z.array(z.string()),
   relatedIds: z.array(idSchema),
+  /** Workspace tags, the same set conversations use. Shared on purpose: a docs-only vocabulary
+      drifts from the one support already speaks. */
+  tagIds: z.array(idSchema).default([]),
   seo: z.object({
     /** Counters in the editor target 55 and 155. */
     titleTag: z.string(),

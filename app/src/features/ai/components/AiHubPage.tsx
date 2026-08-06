@@ -1,11 +1,14 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Sparkles } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { Toggle } from '@/components/settings-primitives'
+import { Button } from '@/components/ui/button'
 import { useAiSettings } from '../hooks/use-ai'
 import { fetchAiAgent } from '../api/ai'
 import { useAiSettingsForm } from '../hooks/use-ai-settings-form'
+import { InstructionsField } from './InstructionsField'
 
 interface FeatureCard {
   key: string
@@ -29,6 +32,21 @@ export function AiHubPage() {
   const data = settings.data
   const workspaceOn = data?.enabled ?? false
 
+  /*
+   * The guidance box holds its own draft.
+   *
+   * The kill switch above saves the instant it is clicked, which is right for a kill switch and
+   * wrong for a paragraph somebody is halfway through typing. Seeded from the server value once
+   * it arrives, and reseeded whenever the saved value changes underneath.
+   */
+  const saved = data?.workspaceInstructions ?? ''
+  const [draftGuidance, setDraftGuidance] = useState(saved)
+  const [seenSaved, setSeenSaved] = useState(saved)
+  if (saved !== seenSaved) {
+    setSeenSaved(saved)
+    setDraftGuidance(saved)
+  }
+
   const cards: FeatureCard[] =
     data === undefined
       ? []
@@ -37,10 +55,12 @@ export function AiHubPage() {
             key: 'summary',
             name: 'Summary',
             what: 'Condenses a long thread so you can pick it up without reading all of it.',
-            to: '/ai/evaluation',
-            on: workspaceOn,
-            metric: 'On demand',
-            metricLabel: 'never automatic',
+            to: '/ai/summary',
+            on: data.summary.enabled,
+            metric: data.summary.autoGenerate ? 'Automatic' : 'On demand',
+            metricLabel: data.summary.autoGenerate
+              ? `over ${String(data.summary.minMessages)} messages`
+              : 'waits to be asked',
           },
           {
             key: 'auto-draft',
@@ -71,7 +91,7 @@ export function AiHubPage() {
           },
           {
             key: 'evaluation',
-            name: 'Evaluation',
+            name: 'Check reply',
             what: 'Checks a reply before you send it. It never blocks Send.',
             to: '/ai/evaluation',
             on: data.evaluation.enabled,
@@ -120,6 +140,49 @@ export function AiHubPage() {
           }
         />
       </div>
+
+      {/*
+       * Workspace guidance, above the features rather than inside one of them.
+       *
+       * Everything below adds its own instructions to this. Describing the business once here is
+       * what stops six feature pages each carrying their own slightly different version of what
+       * the company sells and how it talks.
+       */}
+      {data === undefined ? null : (
+        <InstructionsField
+          title="Workspace guidance"
+          description="Applies to every feature. What you sell, who asks, and the handful of things nobody should ever say."
+          examples={[
+            'We sell a shared inbox helpdesk. Customers are support leads, not end users.',
+            'Never promise a delivery date for anything on the roadmap.',
+            'Refunds outside the 30 day window need a lead.',
+          ]}
+          value={draftGuidance}
+          onChange={setDraftGuidance}
+        />
+      )}
+
+      {draftGuidance !== (data?.workspaceInstructions ?? '') ? (
+        <div className="mb-4 flex items-center gap-2">
+          <Button
+            size="sm"
+            onClick={() => {
+              form.saveNow({ workspaceInstructions: draftGuidance })
+            }}
+          >
+            Save guidance
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setDraftGuidance(data?.workspaceInstructions ?? '')
+            }}
+          >
+            Discard
+          </Button>
+        </div>
+      ) : null}
 
       <div className="grid gap-2 sm:grid-cols-2">
         {cards.map((card) => (

@@ -1,7 +1,10 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import type { CustomField } from '@/types'
-import { fetchCustomFields } from '../api/settings'
+import { createCustomField, fetchCustomFields } from '../api/settings'
+import { CreateDialog } from './CreateDialog'
 import { SettingsPage } from './SettingsPage'
 
 const TYPE_LABEL: Record<CustomField['type'], string> = {
@@ -18,6 +21,28 @@ export function CustomFieldsPage() {
     queryFn: ({ signal }) => fetchCustomFields(signal),
   })
 
+  const [creating, setCreating] = useState(false)
+  const queryClient = useQueryClient()
+
+  const create = useMutation({
+    mutationFn: (values: Record<string, string>) =>
+      createCustomField({
+        label: values['label'] ?? '',
+        type: values['type'] ?? 'text',
+        appliesTo: values['appliesTo'] ?? 'conversation',
+      }),
+    onSuccess: async (field) => {
+      setCreating(false)
+      await queryClient.invalidateQueries({ queryKey: ['custom-fields'] })
+      toast(`${field.label} added`, {
+        description:
+          field.appliesTo === 'conversation'
+            ? 'It shows in the conversation sidebar.'
+            : 'It shows on the customer profile.',
+      })
+    },
+  })
+
   const rows = fields.data ?? []
   const groups = [
     { key: 'conversation' as const, title: 'On a conversation' },
@@ -30,8 +55,46 @@ export function CustomFieldsPage() {
       description="Extra properties your team fills in, shown in the conversation sidebar."
     >
       <div className="mb-3 flex justify-end">
-        <Button size="sm">New field</Button>
+        <Button
+          size="sm"
+          onClick={() => {
+            setCreating(true)
+          }}
+        >
+          New field
+        </Button>
       </div>
+
+      <CreateDialog
+        open={creating}
+        onOpenChange={setCreating}
+        title="New field"
+        description="A field starts optional. Dropdown choices are added once it exists."
+        submitLabel="Create field"
+        pending={create.isPending}
+        onSubmit={(values) => {
+          create.mutate(values)
+        }}
+        fields={[
+          { name: 'label', label: 'Label', placeholder: 'Order number', required: true },
+          {
+            name: 'type',
+            label: 'Type',
+            options: (Object.keys(TYPE_LABEL) as CustomField['type'][]).map((key) => ({
+              value: key,
+              label: TYPE_LABEL[key],
+            })),
+          },
+          {
+            name: 'appliesTo',
+            label: 'Shows on',
+            options: [
+              { value: 'conversation', label: 'A conversation' },
+              { value: 'contact', label: 'A customer' },
+            ],
+          },
+        ]}
+      />
 
       {fields.isPending ? (
         <p className="text-[13px]" style={{ color: 'var(--muted-foreground)' }}>

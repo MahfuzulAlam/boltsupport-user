@@ -1,21 +1,5 @@
 import { Link, Outlet, useNavigate, useParams } from 'react-router-dom'
-import {
-  ChevronDown,
-  ChevronLeft,
-  Clock,
-  Inbox as InboxIcon,
-  Lock,
-  Mail,
-  MessageSquareReply,
-  Reply,
-  Route,
-  Send,
-  SlidersHorizontal,
-  Sparkles,
-  Star,
-  Timer,
-  Workflow,
-} from 'lucide-react'
+import { ChevronDown, ChevronLeft, Inbox as InboxIcon, Sparkles } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,52 +7,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useInboxes } from '@/features/inbox'
-import { SettingsNav, type SettingsNavGroup } from './SettingsNav'
-
-/**
- * The inbox settings rail.
- *
- * AI configuration is workspace level and lives under /ai, so it is a single link at the bottom
- * rather than a duplicated section per inbox: two copies of one setting is how a workspace ends
- * up with two different confidence thresholds and no idea which one is running.
- */
-function groups(inboxId: string): SettingsNavGroup[] {
-  const base = `/inbox/${inboxId}/settings`
-  return [
-    {
-      title: 'General',
-      items: [
-        { to: `${base}/general`, label: 'Edit inbox', icon: InboxIcon },
-        { to: `${base}/channels`, label: 'Channels', icon: Send },
-      ],
-    },
-    {
-      title: 'Workspace',
-      items: [
-        { to: `${base}/saved-replies`, label: 'Saved replies', icon: MessageSquareReply },
-        { to: `${base}/custom-fields`, label: 'Custom fields', icon: SlidersHorizontal },
-      ],
-    },
-    {
-      title: 'Automations',
-      items: [
-        { to: `${base}/workflows`, label: 'Workflows', icon: Workflow },
-        { to: `${base}/slas`, label: 'SLAs', icon: Timer },
-        { to: `${base}/routing`, label: 'Routing', icon: Route },
-      ],
-    },
-    {
-      title: 'Advanced',
-      items: [
-        { to: `${base}/inbox-hours`, label: 'Inbox hours', icon: Clock },
-        { to: `${base}/permissions`, label: 'Permissions', icon: Lock },
-        { to: `${base}/outgoing-email`, label: 'Outgoing email', icon: Mail },
-        { to: `${base}/auto-reply`, label: 'Auto reply', icon: Reply },
-        { to: `${base}/satisfaction-ratings`, label: 'Satisfaction ratings', icon: Star },
-      ],
-    },
-  ]
-}
+import { inboxSettingsNav } from '../nav'
+import { SettingsNav } from './SettingsNav'
 
 export function SettingsLayout() {
   const inboxId = useParams()['inboxId'] ?? 'in1'
@@ -81,7 +21,7 @@ export function SettingsLayout() {
     <div className="flex h-full w-full">
       <SettingsNav
         label="Inbox settings"
-        groups={groups(inboxId)}
+        groups={inboxSettingsNav(inboxId)}
         header={
           <>
             <Link

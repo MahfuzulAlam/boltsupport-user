@@ -171,7 +171,7 @@ export const ConversationRow = memo(function ConversationRow({
         </div>
       </div>
 
-      <div className="flex w-[82px] shrink-0 justify-end">
+      <div className="flex w-[92px] shrink-0 justify-end">
         <SlaBadge sla={sla} />
       </div>
 

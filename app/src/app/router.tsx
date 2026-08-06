@@ -112,32 +112,6 @@ export const router = createBrowserRouter([
         }),
       },
       {
-        path: '/ai/auto-assign',
-        lazy: async () => ({
-          Component: (await import('@/features/ai/components/AutoAssignSettingsPage'))
-            .AutoAssignSettingsPage,
-        }),
-      },
-      {
-        path: '/ai/auto-tag',
-        lazy: async () => ({
-          Component: (await import('@/features/ai/components/AutoTagSettingsPage'))
-            .AutoTagSettingsPage,
-        }),
-      },
-      {
-        path: '/ai/evaluation',
-        lazy: async () => ({
-          Component: (await import('@/features/ai/components/EvaluationPage')).EvaluationPage,
-        }),
-      },
-      {
-        path: '/ai/auto-tag/review',
-        lazy: async () => ({
-          Component: (await import('@/features/ai/components/TagReviewPage')).TagReviewPage,
-        }),
-      },
-      {
         path: '/inbox/:inboxId/new',
         lazy: async () => ({
           Component: (await import('@/features/composer/components/NewConversationPage'))
@@ -387,24 +361,126 @@ export const router = createBrowserRouter([
           Component: (await import('@/features/settings/components/MessagesPage')).MessagesPage,
         }),
       },
+      /*
+       * Everything under /ai, inside one rail.
+       *
+       * A pathless layout route with absolute path children: the pages keep the URLs they always
+       * had, and the rail is mounted once rather than by each page remembering to include it.
+       * The agent setup wizard is deliberately outside it, since a wizard with a settings rail
+       * beside it is a wizard you can wander out of halfway through.
+       */
       {
-        path: '/ai',
         lazy: async () => ({
-          Component: (await import('@/features/ai/components/AiHubPage')).AiHubPage,
+          Component: (await import('@/features/ai/components/AiSettingsLayout')).AiSettingsLayout,
         }),
+        children: [
+          {
+            path: '/ai',
+            lazy: async () => ({
+              Component: (await import('@/features/ai/components/AiHubPage')).AiHubPage,
+            }),
+          },
+          {
+            path: '/ai/knowledge',
+            lazy: async () => ({
+              Component: (await import('@/features/ai/components/AiKnowledgePage')).AiKnowledgePage,
+            }),
+          },
+          {
+            path: '/ai/summary',
+            lazy: async () => ({
+              Component: (await import('@/features/ai/components/SummarySettingsPage'))
+                .SummarySettingsPage,
+            }),
+          },
+          {
+            path: '/ai/auto-draft',
+            lazy: async () => ({
+              Component: (await import('@/features/ai/components/AutoDraftSettingsPage'))
+                .AutoDraftSettingsPage,
+            }),
+          },
+          {
+            path: '/ai/auto-tag',
+            lazy: async () => ({
+              Component: (await import('@/features/ai/components/AutoTagSettingsPage'))
+                .AutoTagSettingsPage,
+            }),
+          },
+          {
+            path: '/ai/auto-tag/review',
+            lazy: async () => ({
+              Component: (await import('@/features/ai/components/TagReviewPage')).TagReviewPage,
+            }),
+          },
+          {
+            path: '/ai/auto-assign',
+            lazy: async () => ({
+              Component: (await import('@/features/ai/components/AutoAssignSettingsPage'))
+                .AutoAssignSettingsPage,
+            }),
+          },
+          {
+            path: '/ai/evaluation',
+            lazy: async () => ({
+              Component: (await import('@/features/ai/components/EvaluationSettingsPage'))
+                .EvaluationSettingsPage,
+            }),
+          },
+          {
+            path: '/ai/evaluation/results',
+            lazy: async () => ({
+              Component: (await import('@/features/ai/components/EvaluationPage')).EvaluationPage,
+            }),
+          },
+          {
+            path: '/ai/satisfaction',
+            lazy: async () => ({
+              Component: (await import('@/features/ai/components/SatisfactionSettingsPage'))
+                .SatisfactionSettingsPage,
+            }),
+          },
+          {
+            path: '/ai/health-score',
+            lazy: async () => ({
+              Component: (await import('@/features/ai/components/risk/RiskSettingsPages'))
+                .HealthScoreSettingsPage,
+            }),
+          },
+          {
+            path: '/ai/sentiment-drift',
+            lazy: async () => ({
+              Component: (await import('@/features/ai/components/risk/RiskSettingsPages'))
+                .SentimentDriftSettingsPage,
+            }),
+          },
+          {
+            path: '/ai/silent-churn',
+            lazy: async () => ({
+              Component: (await import('@/features/ai/components/risk/ChurnAndRefundSettings'))
+                .SilentChurnSettingsPage,
+            }),
+          },
+          {
+            path: '/ai/refund-threat',
+            lazy: async () => ({
+              Component: (await import('@/features/ai/components/risk/ChurnAndRefundSettings'))
+                .RefundThreatSettingsPage,
+            }),
+          },
+          {
+            path: '/ai/agent',
+            lazy: async () => ({
+              Component: (await import('@/features/ai/components/agent/AgentPage')).AgentPage,
+            }),
+          },
+        ],
       },
       {
-        path: '/ai/auto-draft',
+        path: '/ai/agent/setup',
         lazy: async () => ({
-          Component: (await import('@/features/ai/components/AutoDraftSettingsPage'))
-            .AutoDraftSettingsPage,
-        }),
-      },
-      {
-        path: '/ai/satisfaction',
-        lazy: async () => ({
-          Component: (await import('@/features/ai/components/SatisfactionSettingsPage'))
-            .SatisfactionSettingsPage,
+          Component: (await import('@/features/ai/components/agent/AgentSetupWizard'))
+            .AgentSetupWizard,
         }),
       },
       {
@@ -450,19 +526,6 @@ export const router = createBrowserRouter([
         lazy: async () => ({
           Component: (await import('@/features/reports/components/SatisfactionReport'))
             .SatisfactionReport,
-        }),
-      },
-      {
-        path: '/ai/agent',
-        lazy: async () => ({
-          Component: (await import('@/features/ai/components/agent/AgentPage')).AgentPage,
-        }),
-      },
-      {
-        path: '/ai/agent/setup',
-        lazy: async () => ({
-          Component: (await import('@/features/ai/components/agent/AgentSetupWizard'))
-            .AgentSetupWizard,
         }),
       },
       // Proof sheets from steps 1 and 2. Not in the nav, but kept reachable so a token or a

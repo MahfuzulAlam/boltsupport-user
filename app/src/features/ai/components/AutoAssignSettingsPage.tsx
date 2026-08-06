@@ -8,6 +8,8 @@ import {
   Toggle,
 } from '@/components/settings-primitives'
 import { useAiSettingsForm } from '../hooks/use-ai-settings-form'
+import { InstructionsField } from './InstructionsField'
+import { KnowledgeUsage } from './KnowledgeUsage'
 
 const SIGNALS = [
   {
@@ -89,6 +91,20 @@ export function AutoAssignSettingsPage() {
           </p>
         </SettingsSection>
 
+        <SettingsSection
+          title="Who can receive work"
+          description="Routing to somebody who is away is how a conversation sits untouched for a day."
+        >
+          <Toggle
+            checked={autoAssign.respectAvailability}
+            onChange={(respectAvailability) => {
+              patch({ respectAvailability })
+            }}
+            label="Skip anyone marked away"
+            description="They keep what they already hold; nothing new is routed to them."
+          />
+        </SettingsSection>
+
         <SettingsSection title="Mode">
           <ModeCards
             mode={autoAssign.mode}
@@ -161,6 +177,23 @@ export function AutoAssignSettingsPage() {
             />
           </label>
         </SettingsSection>
+
+        <InstructionsField
+          title="Routing instructions"
+          description="Guidance for routing only. Signals are matched automatically; this is for the rules they cannot express."
+          examples={[
+            'Route anything mentioning SAML or SCIM to whoever last handled one.',
+            'Keep a customer with the agent who answered them last week.',
+            'Never route a chargeback to someone in their first month.',
+          ]}
+          value={autoAssign.instructions}
+          onChange={(instructions) => {
+            patch({ instructions })
+          }}
+          workspace={form.settings.workspaceInstructions}
+        />
+
+        <KnowledgeUsage feature="autoAssign" />
       </div>
 
       <StickySaveBar

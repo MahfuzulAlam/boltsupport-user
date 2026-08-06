@@ -8,7 +8,6 @@ import {
   Inbox as InboxIcon,
   MessageCircle,
   PenSquare,
-  Plus,
   Settings,
   Sparkles,
   UserRound,
@@ -160,15 +159,10 @@ export function FolderSidebar({ inbox, views }: FolderSidebarProps) {
         {collapsed ? (
           <div className="my-2 h-px" style={{ background: 'var(--border)' }} aria-hidden="true" />
         ) : (
-          <div className="mt-4 flex items-center justify-between px-2.5">
+          // No "+" here until there is a view builder to open. It used to sit at the end of this
+          // row and do nothing, which reads as a broken button rather than a missing one.
+          <div className="mt-4 px-2.5">
             <span className="eyebrow">Views</span>
-            <button
-              type="button"
-              aria-label="Create a view"
-              className="flex size-6 items-center justify-center rounded hover:bg-[color:var(--hover)]"
-            >
-              <Plus className="size-3.5" style={{ color: 'var(--muted-foreground)' }} />
-            </button>
           </div>
         )}
 

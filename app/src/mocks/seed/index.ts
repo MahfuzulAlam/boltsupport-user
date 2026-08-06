@@ -1,5 +1,6 @@
 import type { Session } from '@/types'
-import { aiAgent, aiSettings } from './ai-config'
+import { aiAgent, aiSettings, knowledgeBases } from './ai-config'
+import { accountHealth, churnAlerts, refundThreats, sentimentDrift } from './risk'
 import { routing, slaPolicies, workflows } from './automation'
 import {
   autoReply,
@@ -59,6 +60,11 @@ export function createSeedData() {
     connectedApps: structuredClone(connectedApps),
     aiSettings: structuredClone(aiSettings),
     aiAgent: structuredClone(aiAgent),
+    knowledgeBases: structuredClone(knowledgeBases),
+    accountHealth: structuredClone(accountHealth),
+    sentimentDrift: structuredClone(sentimentDrift),
+    churnAlerts: structuredClone(churnAlerts),
+    refundThreats: structuredClone(refundThreats),
     ...generated,
   }
 }

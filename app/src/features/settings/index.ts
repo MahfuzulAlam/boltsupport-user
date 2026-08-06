@@ -8,3 +8,5 @@ export {
   fetchIntegrations,
   type InboxDoc,
 } from './api/settings'
+// The rail itself, so any feature with settings pages can use the same one.
+export { SettingsNav, type SettingsNavGroup, type SettingsNavItem } from './components/SettingsNav'

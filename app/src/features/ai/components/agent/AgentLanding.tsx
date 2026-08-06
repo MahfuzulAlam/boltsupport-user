@@ -37,9 +37,6 @@ export function AgentLanding() {
             You are only charged when the agent resolves a customer question without human
             assistance.
           </p>
-          <Button variant="outline" size="sm">
-            See pricing
-          </Button>
         </div>
 
         <div className="grid items-center gap-10 p-8 lg:grid-cols-2">

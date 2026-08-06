@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { format, formatDistanceToNowStrict } from 'date-fns'
+import type { WhenChoice } from '@/components/WhenDialog'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -18,7 +19,13 @@ import { ApiError, apiRequest } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import { FolderSidebar, fetchTags, fetchUsers, useInboxes } from '@/features/inbox'
 import { hasStoredDraft, type ComposerMode } from '@/features/composer'
-import { AiSuggestionStrip, useAiSettings } from '@/features/ai'
+import {
+  AiSuggestionStrip,
+  RefundThreatBanner,
+  useAiSettings,
+  useRefundThreat,
+  useRefundThreatState,
+} from '@/features/ai'
 import { useSession } from '@/features/auth'
 import { isAuthoredMessage, viewSchema, type AiEventMessage } from '@/types'
 import {
@@ -76,6 +83,8 @@ export function ConversationPage() {
   const contact = useContact(conversation.data?.contact.id)
   const users = useQuery({ queryKey: ['users'], queryFn: ({ signal }) => fetchUsers(signal) })
   const edit = useEditConversation(conversationId)
+  const refundThreat = useRefundThreat(conversationId)
+  const setThreatState = useRefundThreatState(conversationId)
   const roomForRail = useMediaQuery(`(min-width: ${String(BREAKPOINTS.rail)}px)`)
   // The folder rail is navigation, so it survives a narrower screen than the customer panel:
   // at 1200px you keep the folders and lose the sidebar, not the other way round.
@@ -152,6 +161,7 @@ export function ConversationPage() {
   }, [messages.data])
 
   const record = conversation.data
+  const threat = refundThreat.data
   const followerIds = record?.followerIds ?? []
   const following = followerIds.includes(currentUserId)
 
@@ -282,6 +292,24 @@ export function ConversationPage() {
     toast('Auto assignment undone', { description: message.aiEvent.detail })
   }
 
+  /*
+   * One snooze for both places that offer it.
+   *
+   * The header icon and the composer footer are two doors onto the same action, and when each
+   * had its own copy of this they had already drifted to different wording for the same outcome.
+   * A snooze is a deferral, so the conversation goes pending and leaves the queue until the time
+   * the agent picked.
+   */
+  const snooze = (choice: WhenChoice) => {
+    edit.mutate({ status: 'pending' })
+    toast(`Snoozed until ${format(choice.at, 'EEE d MMM, h:mm a')}`, {
+      description:
+        choice.condition === 'if-no-reply'
+          ? 'It comes back sooner if the customer replies.'
+          : 'It stays out of the queue until then.',
+    })
+  }
+
   const menu = (
     <ConversationActions
       following={following}
@@ -339,10 +367,15 @@ export function ConversationPage() {
           conversation={record}
           backTo={backTo}
           allTags={tagList.data ?? []}
+          users={users.data ?? []}
           actions={menu}
           onEdit={(change) => {
             edit.mutate(change)
           }}
+          onAssign={(userId) => {
+            edit.mutate({ assigneeId: userId })
+          }}
+          onSnooze={snooze}
         />
 
         {aiEnabled ? (
@@ -362,6 +395,21 @@ export function ConversationPage() {
         {presence.length > 0 ? (
           <CollisionBanner presence={presence} users={userMap} since={record.updatedAt} />
         ) : null}
+
+        {/* Above the thread, not in the sidebar. This one is worth interrupting for, and an agent
+            who has already started reading the messages has passed the point where it helps. */}
+        {threat === null || threat === undefined ? null : (
+          <RefundThreatBanner
+            threat={threat}
+            pending={setThreatState.isPending}
+            onEscalate={() => {
+              setThreatState.mutate({ id: threat.id, state: 'escalated' })
+            }}
+            onDismiss={() => {
+              setThreatState.mutate({ id: threat.id, state: 'dismissed' })
+            }}
+          />
+        )}
 
         <div aria-live="polite" className="sr-only">
           {announcement}
@@ -435,17 +483,7 @@ export function ConversationPage() {
                   edit.mutate({ assigneeId: userId })
                 },
               }}
-              onSnooze={(choice) => {
-                // A snooze is a deferral, so the conversation goes pending and leaves the queue
-                // until the time the agent picked.
-                edit.mutate({ status: 'pending' })
-                toast(`Snoozed until ${format(choice.at, 'EEE d MMM, h:mm a')}`, {
-                  description:
-                    choice.condition === 'if-no-reply'
-                      ? 'It comes back sooner if the customer replies.'
-                      : 'It stays out of the queue until then.',
-                })
-              }}
+              onSnooze={snooze}
               forwardQuote={forwardQuote}
               expanded={expanded}
               onToggleExpand={() => {

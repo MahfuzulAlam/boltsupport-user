@@ -68,8 +68,11 @@ describe('the SLA countdown', () => {
 
   it('says how overdue a breach is, not just that it happened', () => {
     render(<SlaBadge sla={sla(-135)} />)
-    // FR-5.6. "Breached" alone does not tell you whether to apologise for two minutes or two hours.
-    expect(screen.getByText('Breached 2h 15m')).toBeInTheDocument()
+    // FR-5.6. "Breached" alone does not tell you whether to apologise for two minutes or two hours,
+    // so the duration is what the chip spends its width on. The word moved to the accessible name
+    // once "Breached 2h 15m" turned out not to fit the column.
+    expect(screen.getByText('2h 15m')).toBeInTheDocument()
+    expect(screen.getByLabelText('Breached, 2h 15m overdue')).toBeInTheDocument()
   })
 
   it('names who the clock is waiting on when it is paused', () => {
@@ -80,5 +83,43 @@ describe('the SLA countdown', () => {
   it('renders nothing when a conversation has no policy', () => {
     const { container } = render(<SlaBadge sla={undefined} />)
     expect(container).toBeEmptyDOMElement()
+  })
+})
+
+/**
+ * The badge shares a 92px column with every other SLA state and has a fixed 24px height. Those two
+ * facts together mean any label long enough to wrap spills out of the chip, which is what
+ * "Breached 2h 23m" did: two lines of text inside a 24px box, in the one state that most needs to
+ * look deliberate.
+ */
+describe('the badge fits its column', () => {
+  it('never wraps, whatever state it is in', () => {
+    for (const [name, state] of [
+      ['comfortable', sla(1200)],
+      ['warning', sla(45)],
+      ['breached', sla(-180)],
+      ['paused', sla(30, true)],
+    ] as const) {
+      const { container, unmount } = render(<SlaBadge sla={state} />)
+      const chip = container.firstElementChild
+
+      expect(chip?.className, name).toContain('whitespace-nowrap')
+      // Fixed height plus a wrapping label is how the text ended up outside the chip.
+      expect(chip?.className, name).toContain('h-6')
+      unmount()
+    }
+  })
+
+  it('spends the width on the time rather than repeating what the colour says', () => {
+    render(<SlaBadge sla={sla(-143)} />)
+
+    // The solid red fill is the breached signal, and it is the only urgency that inverts. Saying
+    // it again in words cost sixty of the ninety-two pixels the chip has.
+    expect(screen.queryByText(/^Breached \d/)).not.toBeInTheDocument()
+  })
+
+  it('reads as a countdown rather than an overdue time while it is still running', () => {
+    render(<SlaBadge sla={sla(300)} />)
+    expect(screen.getByLabelText(/^First reply due in /)).toBeInTheDocument()
   })
 })

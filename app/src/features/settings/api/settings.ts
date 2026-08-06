@@ -113,3 +113,35 @@ export function createConnectedApp(name: string) {
 export function deleteConnectedApp(id: string) {
   return apiRequest(`/account/apps/${id}`, z.unknown(), { method: 'DELETE' })
 }
+
+/*
+ * The create calls behind the settings pages. Each returns the created row so a caller can
+ * invalidate and, where it matters, point at what it just made.
+ */
+
+export function inviteUser(input: { name: string; email: string; role: string }) {
+  return apiRequest('/users', userSchema, { method: 'POST', body: input })
+}
+
+export function createTag(input: { name: string; color: string }) {
+  return apiRequest('/tags', tagSchema, { method: 'POST', body: input })
+}
+
+export function createTeam(input: { name: string }) {
+  return apiRequest('/teams', teamSchema, { method: 'POST', body: input })
+}
+
+export function createCustomField(input: { label: string; type: string; appliesTo: string }) {
+  return apiRequest('/custom-fields', customFieldSchema, { method: 'POST', body: input })
+}
+
+export function createSavedReply(input: { name: string; body: string }) {
+  return apiRequest('/saved-replies', savedReplySchema, { method: 'POST', body: input })
+}
+
+export function setIntegrationConnected(id: string, connected: boolean) {
+  return apiRequest(`/integrations/${id}`, integrationSchema, {
+    method: 'PATCH',
+    body: { connected },
+  })
+}

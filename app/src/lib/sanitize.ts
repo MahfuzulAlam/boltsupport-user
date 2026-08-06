@@ -121,27 +121,71 @@ export function sanitizeEmailHtml(raw: string, options: SanitizeOptions): Saniti
 }
 
 /**
+ * The colours the frame paints with.
+ *
+ * The frame is a separate document, so it cannot read a CSS variable off the app. Every value it
+ * needs is passed in instead, resolved from the same token sheet the rest of the page uses, which
+ * is what lets the email follow both the light or dark mode and the chosen accent.
+ */
+export interface EmailPalette {
+  /**
+   * The one that actually mattered.
+   *
+   * An iframe whose document does not declare a colour scheme gets the light default, and the
+   * browser paints that canvas white. `background: transparent` on html and body cannot override
+   * a canvas, so every email in the thread rendered as a white slab in dark mode no matter what
+   * the surrounding card was doing.
+   */
+  scheme: 'light' | 'dark'
+  ink: string
+  muted: string
+  link: string
+  border: string
+}
+
+/** The light values, so a caller with no DOM to read from still gets a sane frame. */
+export const DEFAULT_EMAIL_PALETTE: EmailPalette = {
+  scheme: 'light',
+  ink: 'hsl(222 24% 11%)',
+  muted: 'hsl(220 9% 44%)',
+  link: 'hsl(222 89% 52%)',
+  border: 'hsl(220 13% 91%)',
+}
+
+/**
  * The document mounted into the iframe.
  *
  * The CSP here is a second boundary inside the sandbox: even if something slipped past
  * DOMPurify, `default-src 'none'` means it has nowhere to send anything. Images are only
  * permitted once the agent has asked for them.
+ *
+ * The palette styles the frame's own chrome and sets the inherited text colour. It cannot reach
+ * inside an email that carries its own inline colours, and it deliberately does not try: rewriting
+ * a sender's markup to suit our theme is how a quoted brand colour or a warning banner ends up
+ * saying something the sender did not.
  */
-export function buildEmailDocument(html: string, allowRemoteImages: boolean): string {
+export function buildEmailDocument(
+  html: string,
+  allowRemoteImages: boolean,
+  palette: EmailPalette = DEFAULT_EMAIL_PALETTE,
+): string {
   const imgSrc = allowRemoteImages ? 'https: data:' : "'none'"
   return `<!doctype html>
 <html><head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${imgSrc}; style-src 'unsafe-inline'; font-src 'none'; form-action 'none'; base-uri 'none'">
 <style>
-  html,body{margin:0;padding:0;background:transparent;color:#161a22;
+  :root{color-scheme:${palette.scheme}}
+  html,body{margin:0;padding:0;background:transparent;color:${palette.ink};
     font:15px/1.6 'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif;overflow-wrap:break-word}
-  a{color:#2563f0}
+  a{color:${palette.link}}
   a[data-blocked-link]{color:inherit;text-decoration:line-through;cursor:not-allowed}
   img{max-width:100%;height:auto}
   img[data-blocked-image]{display:inline-block;min-width:80px;min-height:24px;
-    border:1px dashed #d1d5db;border-radius:4px;padding:4px 8px;font-size:12px;color:#6b7280}
-  blockquote{margin:0 0 0 8px;padding-left:12px;border-left:2px solid #e5e7eb;color:#6b7280}
+    border:1px dashed ${palette.border};border-radius:4px;padding:4px 8px;font-size:12px;
+    color:${palette.muted}}
+  blockquote{margin:0 0 0 8px;padding-left:12px;border-left:2px solid ${palette.border};
+    color:${palette.muted}}
   table{max-width:100%}
 </style>
 </head><body>${html}</body></html>`

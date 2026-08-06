@@ -1,4 +1,4 @@
-import { Pause } from 'lucide-react'
+import { Pause, TriangleAlert } from 'lucide-react'
 import { useNow } from '@/hooks/use-now'
 import { formatDuration, slaUrgency, type SlaUrgency } from '@/lib/duration'
 import type { SlaState } from '@/types'
@@ -39,7 +39,7 @@ export function SlaBadge({ sla, variant = 'compact' }: SlaBadgeProps) {
   if (urgency === 'paused') {
     return (
       <span
-        className="inline-flex h-6 max-w-full items-center gap-1 rounded px-2 font-mono text-[12px] font-medium"
+        className="inline-flex h-6 max-w-full items-center gap-1 rounded px-2 font-mono text-[12px] font-medium whitespace-nowrap"
         style={{ background: style.bg, color: style.fg }}
         title={`Paused, waiting on the customer. First reply was due ${absolute}`}
       >
@@ -51,18 +51,31 @@ export function SlaBadge({ sla, variant = 'compact' }: SlaBadgeProps) {
     )
   }
 
-  const label =
-    urgency === 'breached' ? `Breached ${formatDuration(remaining)}` : formatDuration(remaining)
+  const breached = urgency === 'breached'
+  const elapsed = formatDuration(remaining)
 
+  /*
+   * Breached shows an icon and the time, not the word.
+   *
+   * It used to read "Breached 2h 23m", which needs about 110px of mono. The SLA column is 82px, so
+   * the label wrapped to two lines inside a fixed 24px box and the text spilled out of the red
+   * chip, top and bottom. It made the one badge that has to be scannable the one that looked
+   * broken.
+   *
+   * The solid red fill already says breached: it is the only urgency that inverts, which is what
+   * makes it findable while scanning. Spending sixty of eighty-two pixels repeating that in words
+   * cost the elapsed time, which is the part somebody acts on. The word moves to the accessible
+   * name so colour is never the only carrier of the state.
+   */
   return (
     <span
-      className="inline-flex h-6 items-center rounded px-2 font-mono text-[12px] font-medium"
+      className="inline-flex h-6 items-center gap-1 rounded px-2 font-mono text-[12px] font-medium whitespace-nowrap"
       style={{ background: style.bg, color: style.fg }}
-      title={
-        urgency === 'breached' ? `First reply was due ${absolute}` : `First reply due ${absolute}`
-      }
+      aria-label={breached ? `Breached, ${elapsed} overdue` : `First reply due in ${elapsed}`}
+      title={breached ? `First reply was due ${absolute}` : `First reply due ${absolute}`}
     >
-      {label}
+      {breached ? <TriangleAlert className="size-3 shrink-0" aria-hidden="true" /> : null}
+      {elapsed}
     </span>
   )
 }

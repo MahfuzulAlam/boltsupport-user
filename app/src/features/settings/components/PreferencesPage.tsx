@@ -4,7 +4,8 @@ import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/Select'
 import { StickySaveBar, Toggle } from '@/components/settings-primitives'
-import { ACCENTS, ACCENT_LIST, useAccent, type Accent } from '@/hooks/use-accent'
+import { useAccent } from '@/hooks/use-accent'
+import { ACCENTS, ACCENT_LIST, accentTokens, type Accent } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 
 /** Enough of the world to be useful without pretending to be a full tz database. */
@@ -129,7 +130,7 @@ function AccentPicker({ value, onPick }: { value: Accent; onPick: (accent: Accen
             <span
               className="flex size-10 items-center justify-center rounded-full transition-transform"
               style={{
-                background: `hsl(${definition.light})`,
+                background: accentTokens(accent, 'light')['--brand'],
                 boxShadow: active ? '0 0 0 3px var(--card), 0 0 0 5px var(--foreground)' : 'none',
               }}
             >

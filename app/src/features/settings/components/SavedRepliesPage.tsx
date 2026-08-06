@@ -1,9 +1,12 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { Zap } from 'lucide-react'
 import { EmptyState } from '@/components/EmptyState'
 import { Button } from '@/components/ui/button'
 import { shortcutDisplay } from '@/lib/shortcuts'
-import { fetchSavedReplies } from '../api/settings'
+import { createSavedReply, fetchSavedReplies } from '../api/settings'
+import { CreateDialog } from './CreateDialog'
 import { SettingsPage } from './SettingsPage'
 
 /** Strips the stored HTML to a single line of text for the list preview. */
@@ -21,6 +24,18 @@ export function SavedRepliesPage() {
   })
 
   const rows = replies.data ?? []
+  const [creating, setCreating] = useState(false)
+  const queryClient = useQueryClient()
+
+  const create = useMutation({
+    mutationFn: (values: Record<string, string>) =>
+      createSavedReply({ name: values['name'] ?? '', body: values['body'] ?? '' }),
+    onSuccess: async (reply) => {
+      setCreating(false)
+      await queryClient.invalidateQueries({ queryKey: ['saved-replies'] })
+      toast(`${reply.name} saved`, { description: 'Reach it from the composer with /.' })
+    },
+  })
 
   return (
     <SettingsPage
@@ -36,12 +51,27 @@ export function SavedRepliesPage() {
           icon={Zap}
           title="No saved replies yet"
           description="The answer you type more than twice belongs here."
-          action={<Button>New saved reply</Button>}
+          action={
+            <Button
+              onClick={() => {
+                setCreating(true)
+              }}
+            >
+              New saved reply
+            </Button>
+          }
         />
       ) : (
         <>
           <div className="mb-3 flex justify-end">
-            <Button size="sm">New saved reply</Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                setCreating(true)
+              }}
+            >
+              New saved reply
+            </Button>
           </div>
 
           <div
@@ -80,6 +110,28 @@ export function SavedRepliesPage() {
           </div>
         </>
       )}
+      <CreateDialog
+        open={creating}
+        onOpenChange={setCreating}
+        title="New saved reply"
+        description="Type it as plain text. The composer inserts it as paragraphs, and merge fields still work."
+        submitLabel="Save reply"
+        pending={create.isPending}
+        onSubmit={(values) => {
+          create.mutate(values)
+        }}
+        fields={[
+          { name: 'name', label: 'Name', placeholder: 'Refund approved', required: true },
+          {
+            name: 'body',
+            label: 'Reply',
+            multiline: true,
+            placeholder: 'Hi {{contact.firstName}},\n\nYour refund is on its way.',
+            hint: 'Merge fields fall back to plain text when there is nothing to fill in.',
+            required: true,
+          },
+        ]}
+      />
     </SettingsPage>
   )
 }

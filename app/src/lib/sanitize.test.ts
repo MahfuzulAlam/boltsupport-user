@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildEmailDocument, sanitizeEmailHtml } from './sanitize'
+import { buildEmailDocument, DEFAULT_EMAIL_PALETTE, sanitizeEmailHtml } from './sanitize'
 import { HOSTILE_EMAIL_HTML } from '@/mocks/seed'
 
 const blocked = { allowRemoteImages: false }
@@ -135,5 +135,39 @@ describe('buildEmailDocument', () => {
     expect(doc).toContain("default-src 'none'")
     expect(doc).toContain("form-action 'none'")
     expect(doc).toContain("base-uri 'none'")
+  })
+
+  /*
+   * The frame is a separate document, and one that does not declare a colour scheme gets the light
+   * default. The browser then paints that canvas white, which `background: transparent` cannot
+   * override, so in dark mode every email in the thread rendered as a white slab with black text
+   * regardless of the card behind it.
+   */
+  it('declares its colour scheme, which is what stops the canvas painting white', () => {
+    expect(
+      buildEmailDocument('<p>x</p>', false, { ...DEFAULT_EMAIL_PALETTE, scheme: 'dark' }),
+    ).toContain('color-scheme:dark')
+    expect(buildEmailDocument('<p>x</p>', false)).toContain('color-scheme:light')
+  })
+
+  it('paints with the palette it is given rather than hardcoded ink', () => {
+    const doc = buildEmailDocument('<p>x</p>', false, {
+      scheme: 'dark',
+      ink: 'hsl(210 20% 96%)',
+      muted: 'hsl(215 16% 62%)',
+      link: 'hsl(340 82% 68%)',
+      border: 'hsl(340 16% 19%)',
+    })
+
+    expect(doc).toContain('color:hsl(210 20% 96%)')
+    // The link follows the accent too, so an email does not stay cobalt in a rose workspace.
+    expect(doc).toContain('a{color:hsl(340 82% 68%)}')
+    expect(doc).not.toContain('#161a22')
+    expect(doc).not.toContain('#2563f0')
+  })
+
+  it('leaves the background transparent so the email sits on the card, not on a slab', () => {
+    const doc = buildEmailDocument('<p>x</p>', false)
+    expect(doc).toContain('background:transparent')
   })
 })

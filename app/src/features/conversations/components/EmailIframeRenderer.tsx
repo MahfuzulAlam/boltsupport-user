@@ -1,6 +1,12 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ImageOff, ShieldCheck } from 'lucide-react'
-import { buildEmailDocument, measureEmailHeight, sanitizeEmailHtml } from '@/lib/sanitize'
+import {
+  buildEmailDocument,
+  measureEmailHeight,
+  sanitizeEmailHtml,
+  type EmailPalette,
+} from '@/lib/sanitize'
+import { useTheme } from '@/hooks/use-theme'
 
 interface EmailIframeRendererProps {
   bodyHtml: string
@@ -10,6 +16,26 @@ interface EmailIframeRendererProps {
 
 /** Until the body has been measured, and the floor for a one-line reply. */
 const MIN_HEIGHT = 44
+
+/**
+ * The frame's palette, read off the live token sheet.
+ *
+ * Resolved rather than hardcoded so the email follows the accent as well as the mode: the theme
+ * module rewrites `--brand`, and a link inside an email that stayed cobalt while the rest of the
+ * app went rose is the kind of mismatch that reads as a rendering fault.
+ */
+function readPalette(mode: 'light' | 'dark'): EmailPalette {
+  const style = getComputedStyle(document.documentElement)
+  const token = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback
+
+  return {
+    scheme: mode,
+    ink: token('--foreground', 'hsl(222 24% 11%)'),
+    muted: token('--muted-foreground', 'hsl(220 9% 44%)'),
+    link: token('--brand', 'hsl(222 89% 52%)'),
+    border: token('--border', 'hsl(220 13% 91%)'),
+  }
+}
 
 /**
  * The only component in the codebase that renders untrusted HTML.
@@ -38,7 +64,14 @@ export function EmailIframeRenderer({ bodyHtml, authorName }: EmailIframeRendere
     [bodyHtml, showImages],
   )
 
-  const srcDoc = useMemo(() => buildEmailDocument(html, showImages), [html, showImages])
+  // Subscribing to the store rather than reading the class once: the palette has to be recomputed
+  // when somebody flips the theme, and a memo keyed only on the html would keep the old colours.
+  const theme = useTheme((state) => state.theme)
+
+  const srcDoc = useMemo(
+    () => buildEmailDocument(html, showImages, readPalette(theme)),
+    [html, showImages, theme],
+  )
   const hasNotice = blockedImages > 0 || strippedTrackers > 0 || blockedLinks > 0
 
   /*

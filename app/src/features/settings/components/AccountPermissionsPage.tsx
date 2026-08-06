@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { Select } from '@/components/Select'
@@ -70,9 +70,22 @@ export function AccountPermissionsPage() {
   const inboxes = useInboxes()
   const all = inboxes.data ?? []
 
-  const [saved, setSaved] = useState<Access>({ role: 'owner', inboxes: {} })
+  /*
+   * The role is read off the session, not assumed.
+   *
+   * This page used to open on "Account owner" for everybody, including the seeded admin whose
+   * name is printed directly above it. A permissions screen that overstates what you can do is
+   * worse than one that is missing: you plan around the answer it gives you. Until the session
+   * lands the fallback is the narrowest role, so the page never claims access nobody has.
+   */
+  const base = useMemo<Access>(
+    () => ({ role: session?.user.role ?? 'agent', inboxes: {} }),
+    [session?.user.role],
+  )
+
+  const [saved, setSaved] = useState<Partial<Access>>({})
   const [edits, setEdits] = useState<Partial<Access>>({})
-  const value = { ...saved, ...edits }
+  const value: Access = { ...base, ...saved, ...edits }
   const dirty = Object.keys(edits).length > 0
 
   /*
